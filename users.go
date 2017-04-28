@@ -6,19 +6,33 @@ import (
 	"net/http"
 
 	"github.com/JackyChiu/realworld-starter-kit/auth"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // User is the model and json repersentation of a user
 type User struct {
 	gorm.Model `json:"-"`
-	Username   string `json:"username"`
 	Email      string `json:"email"`
+	Token      string `json:"token" gorm:"-"`
+	Username   string `json:"username"`
 	Password   string `json:"password"`
 	Bio        string `json:"bio"`
 	Image      string `json:"image"`
-	Token      string `json:"token" gorm:"-"`
+}
+
+func (u *User) EncryptPassword() {
+	if u.Password != "" {
+		hash, _ := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+		u.Password = string(hash)
+	}
+}
+
+func (u *User) Save(db *gorm.DB) {
+	u.EncryptPassword()
+	db.Save(u)
 }
 
 // UserJSON is composed of a user and is used
@@ -49,17 +63,29 @@ func UserRouter(w http.ResponseWriter, r *http.Request) {
 }
 
 func RegisterUser(w http.ResponseWriter, r *http.Request) error {
-	u := UserJSON{}
+	var u UserJSON
 
-	err := json.NewDecoder(r.Body).Decode(&u)
-	if err != nil {
-		return err
-	}
+	json.NewDecoder(r.Body).Decode(&u)
 	defer r.Body.Close()
 
-	db.Save(&u.User)
+	u.Save(db)
 	u.Token = auth.NewToken(u.Username)
 
-	json.NewEncoder(w).Encode(u)
+	json.NewEncoder(w).Encode(UserJSON{
+		User{
+			Email:    u.Email,
+			Token:    u.Token,
+			Username: u.Username,
+			Bio:      u.Bio,
+			Image:    u.Image,
+		},
+	})
 	return nil
+}
+
+func LoginUser(w http.ResponseWriter, r *http.Request) {
+	var u UserJSON
+
+	json.NewDecoder(r.Body).Decode(&u)
+	defer r.Body.Close()
 }

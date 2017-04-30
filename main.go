@@ -1,35 +1,29 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
+	"os"
 
-	"github.com/JackyChiu/realworld-starter-kit/auth"
-	"github.com/jinzhu/gorm"
+	"github.com/JackyChiu/realworld-starter-kit/handlers"
+	"github.com/JackyChiu/realworld-starter-kit/models"
 )
 
-var db *gorm.DB
+const (
+	DATABASE string = "conduit.db"
+	DIALECT  string = "sqlite3"
+)
 
 func main() {
-	var err error
-	db, err = gorm.Open("sqlite3", "conduit.db")
+	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
+	h := handlers.New(DIALECT, DATABASE, logger)
+
+	models.Init(h.DB)
+
+	http.HandleFunc("/api/users", h.UsersHandler)
+
+	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
-
-	InitUserTable(db)
-
-	http.HandleFunc("/api/users", UserRouter)
-	http.HandleFunc("/api/users/login", auth.CheckAuth(someFunc))
-
-	err = http.ListenAndServe(":8080", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func someFunc(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "hello")
 }

@@ -1,0 +1,55 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/JackyChiu/realworld-starter-kit/auth"
+	"github.com/JackyChiu/realworld-starter-kit/models"
+)
+
+type User struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Token    string `json:"token"`
+	Bio      string `json:"bio"`
+	Image    string `json:"image"`
+}
+
+type UserJSON struct {
+	User *User `json:"user"`
+}
+
+func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	body := struct {
+		User struct {
+			Username string `json:"username"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		} `json:"user"`
+	}{}
+	u := body.User
+
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		h.Logger.Println(err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
+	defer r.Body.Close()
+
+	m := models.User{
+		Username: u.Username,
+		Email:    u.Email,
+		Password: u.Password,
+	}
+	m.Save(h.DB)
+
+	res := &UserJSON{
+		&User{
+			Username: u.Username,
+			Email:    u.Email,
+			Token:    auth.NewToken(u.Username),
+		},
+	}
+	json.NewEncoder(w).Encode(res)
+}

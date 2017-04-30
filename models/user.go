@@ -1,10 +1,13 @@
 package models
 
 import (
+	"fmt"
 	"time"
-
-	"github.com/jinzhu/gorm"
 )
+
+type UserStorer interface {
+	CreateUser(*User) error
+}
 
 type User struct {
 	ID        int
@@ -16,6 +19,28 @@ type User struct {
 	Image     string
 }
 
-func (u *User) Save(db *gorm.DB) {
-	db.Save(u)
+func NewUser(email, username, password string) *User {
+	return &User{
+		Email:    email,
+		Username: username,
+		Password: password,
+	}
+}
+
+func (db *DB) CreateUser(user *User) error {
+	u := User{}
+
+	db.Find(&u, "email = ?", user.Email)
+	if u != (User{}) {
+		return fmt.Errorf("Email already exisits")
+	}
+
+	db.Find(&u, "username = ?", user.Username)
+	if u != (User{}) {
+		return fmt.Errorf("Username already exisits")
+	}
+
+	db.Create(user)
+
+	return nil
 }

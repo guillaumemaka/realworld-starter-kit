@@ -1,10 +1,11 @@
 package handlerfn
 
 import (
-	"chilledoj/myreal/models"
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/chilledoj/realworld-starter-kit/models"
 )
 
 // AppEnvironment holds the database connection pool and logger

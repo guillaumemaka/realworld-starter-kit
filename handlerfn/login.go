@@ -1,12 +1,13 @@
 package handlerfn
 
 import (
-	"chilledoj/myreal/models"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/mail"
 	"strings"
+
+	"github.com/chilledoj/realworld-starter-kit/models"
 )
 
 // Login returns JWT on successful validation of provided credentials

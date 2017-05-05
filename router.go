@@ -1,12 +1,13 @@
 package main
 
 import (
-	hfn "chilledoj/myreal/handlerfn"
-	"chilledoj/myreal/models"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+
+	hfn "github.com/chilledoj/realworld-starter-kit/handlerfn"
+	"github.com/chilledoj/realworld-starter-kit/models"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"

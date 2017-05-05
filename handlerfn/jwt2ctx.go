@@ -1,12 +1,13 @@
 package handlerfn
 
 import (
-	"chilledoj/myreal/models"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/chilledoj/realworld-starter-kit/models"
 )
 
 // Jwt2Ctx is effectively a middleware struct in http.Handler form that puts

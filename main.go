@@ -1,12 +1,13 @@
 package main
 
 import (
-	"chilledoj/myreal/models"
 	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/chilledoj/realworld-starter-kit/models"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/namsral/flag"

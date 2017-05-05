@@ -1,12 +1,13 @@
 package handlerfn
 
 import (
-	"chilledoj/myreal/models"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/mail"
 	"strings"
+
+	"github.com/chilledoj/realworld-starter-kit/models"
 )
 
 // Register route handler (convert to AppHandler)

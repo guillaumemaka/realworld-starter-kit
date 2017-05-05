@@ -17,6 +17,6 @@
 Thumbs.db
 
 # Builds
-./bin
-./build
-./dist
+/bin
+/build
+/dist

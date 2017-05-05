@@ -1,11 +1,12 @@
 package handlerfn
 
 import (
-	"chilledoj/myreal/models"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/chilledoj/realworld-starter-kit/models"
 )
 
 // GetCurrentUser route handler (convert to AppHandler)

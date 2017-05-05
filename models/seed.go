@@ -42,13 +42,13 @@ func (db *DB) Seed() {
 				tags[tagIndex+1],
 				tags[tagIndex+2],
 			},
-			UserID: uint(i%2) + 1,
+			UserID: (i % 2) + 1,
 		}
 
 		db.Create(&a)
 
 		db.Model(&a).Association("Favorites").Append(Favorite{
-			UserID:    uint(a.UserID),
+			UserID:    a.UserID,
 			ArticleID: a.ID,
 		})
 

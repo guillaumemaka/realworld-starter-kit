@@ -12,6 +12,7 @@ import (
 
 	"github.com/JackyChiu/realworld-starter-kit/auth"
 	"github.com/JackyChiu/realworld-starter-kit/models"
+	"github.com/Machiel/slugify"
 )
 
 type articleEntity struct {
@@ -36,7 +37,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		logger.Fatal(err)
 	}
-
+	//db.LogMode(true)
 	db.InitSchema()
 	db.Seed()
 
@@ -260,5 +261,199 @@ func TestArticlesHandler_Create(t *testing.T) {
 
 	if article := articleResponse.Article; article.Title != "GoLang Web Services" {
 		t.Errorf("should get the correct article title: got %v wamt %v", article.Title, "GoLang Web Services")
+	}
+}
+
+func TestArticlesHandler_UpdateWrongOwner(t *testing.T) {
+	jsonBody, _ := json.Marshal(map[string]interface{}{
+		"article": map[string]string{
+			"title": "Title Should Not Be Updated",
+		},
+	})
+	req, err := http.NewRequest("PUT", "/api/articles/title-1", bytes.NewBuffer(jsonBody))
+
+	jwt := auth.NewJWT().NewToken("user2")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recoder := httptest.NewRecorder()
+	handler := http.HandlerFunc(h.ArticlesHandler)
+
+	handler.ServeHTTP(recoder, req)
+
+	if Code := recoder.Code; Code != http.StatusUnauthorized {
+		t.Errorf("should get an 401 status code: got %v wamt %v", Code, http.StatusUnauthorized)
+	}
+}
+
+func TestArticlesHandler_UpdateNotAuthorized(t *testing.T) {
+	jsonBody, _ := json.Marshal(map[string]interface{}{
+		"article": map[string]string{
+			"title": "Title Should Not Be Updated",
+		},
+	})
+	req, err := http.NewRequest("PUT", "/api/articles/title-1", bytes.NewBuffer(jsonBody))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recoder := httptest.NewRecorder()
+	handler := http.HandlerFunc(h.ArticlesHandler)
+
+	handler.ServeHTTP(recoder, req)
+
+	if Code := recoder.Code; Code != http.StatusUnauthorized {
+		t.Errorf("should get an 401 status code: got %v wamt %v", Code, http.StatusUnauthorized)
+	}
+}
+
+func TestArticlesHandler_UpdateOK(t *testing.T) {
+	updatedTitle := "Title Should Not Be Updated"
+	jsonBody, _ := json.Marshal(map[string]interface{}{
+		"article": map[string]string{
+			"title": updatedTitle,
+		},
+	})
+	req, err := http.NewRequest("PUT", "/api/articles/title-1", bytes.NewBuffer(jsonBody))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jwt := auth.NewJWT().NewToken("user1")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+
+	recoder := httptest.NewRecorder()
+	handler := http.HandlerFunc(h.ArticlesHandler)
+
+	handler.ServeHTTP(recoder, req)
+
+	if Code := recoder.Code; Code != http.StatusOK {
+		t.Errorf("should get an 200 status code: got %v wamt %v", Code, http.StatusOK)
+	}
+
+	var articleResponse ArticleJSON
+	json.NewDecoder(recoder.Body).Decode(&articleResponse)
+
+	article := articleResponse.Article
+	if article.Title != updatedTitle {
+		t.Errorf("should get the correct updated article title: got %v wamt %v", article.Title, updatedTitle)
+	}
+
+	updatedSlug := slugify.Slugify(updatedTitle)
+	if article.Slug != updatedSlug {
+		t.Errorf("should get the correct updated article slug: got %v wamt %v", article.Slug, updatedSlug)
+	}
+}
+
+func TestArticlesHandler_Favorite(t *testing.T) {
+	req, err := http.NewRequest("POST", "/api/articles/title-2/favorite", nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jwt := auth.NewJWT().NewToken("user1")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+
+	recoder := httptest.NewRecorder()
+	handler := http.HandlerFunc(h.ArticlesHandler)
+
+	handler.ServeHTTP(recoder, req)
+
+	var articleResponse ArticleJSON
+	json.NewDecoder(recoder.Body).Decode(&articleResponse)
+
+	if Code := recoder.Code; Code != http.StatusOK {
+		t.Errorf("should get an 200 status code: got %v wamt %v", Code, http.StatusOK)
+	}
+
+	if articleResponse.Article.Favorited != true {
+		t.Errorf("should get favorited: got %v wamt %v", articleResponse.Article.Favorited, true)
+	}
+}
+
+func TestArticlesHandler_FavoriteTwice(t *testing.T) {
+	req, err := http.NewRequest("POST", "/api/articles/title-2/favorite", nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jwt := auth.NewJWT().NewToken("user1")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+
+	recoder := httptest.NewRecorder()
+	handler := http.HandlerFunc(h.ArticlesHandler)
+
+	handler.ServeHTTP(recoder, req)
+
+	var articleResponse ArticleJSON
+	json.NewDecoder(recoder.Body).Decode(&articleResponse)
+
+	if Code := recoder.Code; Code != http.StatusUnprocessableEntity {
+		t.Errorf("should get an 422 status code: got %v wamt %v", Code, http.StatusUnprocessableEntity)
+	}
+	h.Logger.Println(articleResponse)
+	if articleResponse.Article.Favorited != true {
+		t.Errorf("should get favorited: got %v wamt %v", articleResponse.Article.Favorited, true)
+	}
+}
+
+func TestArticlesHandler_Unfavorite(t *testing.T) {
+	req, err := http.NewRequest("DELETE", "/api/articles/title-2/favorite", nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jwt := auth.NewJWT().NewToken("user2")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+
+	recoder := httptest.NewRecorder()
+	handler := http.HandlerFunc(h.ArticlesHandler)
+
+	handler.ServeHTTP(recoder, req)
+
+	var articleResponse ArticleJSON
+	json.NewDecoder(recoder.Body).Decode(&articleResponse)
+
+	if Code := recoder.Code; Code != http.StatusOK {
+		t.Errorf("should get an 200 status code: got %v wamt %v", Code, http.StatusOK)
+	}
+
+	if articleResponse.Article.Favorited != false {
+		t.Errorf("should get unfavorited: got %v wamt %v", articleResponse.Article.Favorited, false)
+	}
+}
+
+func TestArticlesHandler_UnfavoriteTwice(t *testing.T) {
+	req, err := http.NewRequest("DELETE", "/api/articles/title-2/favorite", nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jwt := auth.NewJWT().NewToken("user2")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
+
+	recoder := httptest.NewRecorder()
+	handler := http.HandlerFunc(h.ArticlesHandler)
+
+	handler.ServeHTTP(recoder, req)
+
+	var articleResponse ArticleJSON
+	json.NewDecoder(recoder.Body).Decode(&articleResponse)
+
+	if Code := recoder.Code; Code != http.StatusUnprocessableEntity {
+		t.Errorf("should get an 422 status code: got %v wamt %v", Code, http.StatusUnprocessableEntity)
+	}
+	h.Logger.Println(articleResponse)
+	if articleResponse.Article.Favorited != false {
+		t.Errorf("should get unfavorited: got %v wamt %v", articleResponse.Article.Favorited, false)
 	}
 }

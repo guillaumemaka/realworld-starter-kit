@@ -25,8 +25,9 @@ func NewDB(dialect, dbName string) (*DB, error) {
 }
 
 func (db *DB) InitSchema() {
+	db.AutoMigrate(&Favorite{})
 	db.AutoMigrate(&User{})
 	db.AutoMigrate(&Article{})
 	db.AutoMigrate(&Tag{})
-	db.AutoMigrate(&Favorite{})
+
 }

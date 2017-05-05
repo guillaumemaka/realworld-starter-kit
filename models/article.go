@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Machiel/slugify"
@@ -15,37 +16,43 @@ type ArticleStorer interface {
 	GetAllArticlesAuthoredBy(string) ([]Article, error)
 	GetAllArticlesFavoritedBy(string) ([]Article, error)
 	GetAllArticlesWithTag(string) ([]Article, error)
-	GetArticle(string) (Article, error)
-	GetUser(*User) *gorm.DB
-	IsFavorited(*User, *Article) bool
-	IsFollowing(*User, *User) bool
+	GetArticle(string) (*Article, error)
+	FavoriteArticle(int, int) error
+	UnfavoriteArticle(int, int) error
+	FindUserByUsername(string) (*User, error)
+	IsFavorited(int, int) bool
+	IsFollowing(int, int) bool
 	SaveArticle(*Article) error
 }
 
 // Article article model
 type Article struct {
-	ID             uint
+	ID             int
 	Slug           string
 	Title          string
 	Description    string
 	Body           string
 	User           User
-	UserID         uint
+	UserID         int
 	Tags           []Tag `gorm:"many2many:taggings;"`
 	Favorites      []Favorite
-	FavoritesCount uint
+	FavoritesCount int
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
 
 // NewArticle returns a new Article instance.
-func NewArticle(title string, description string, body string, user User) *Article {
+func NewArticle(title string, description string, body string, user *User) *Article {
 	return &Article{
 		Title:       title,
 		Description: description,
 		Body:        body,
-		User:        user,
+		User:        *user,
 	}
+}
+
+func (a *Article) CanUpdate(username string) bool {
+	return a.User.Username == username
 }
 
 // CreateArticle persist a new article
@@ -60,9 +67,10 @@ func (db *DB) SaveArticle(article *Article) (err error) {
 }
 
 // GetArticle retrieve an article by it slug
-func (db *DB) GetArticle(slug string) (article Article, err error) {
-	err = db.DB.Scopes(defaultScope).First(&article, "slug = ?", slug).Error
-	return
+func (db *DB) GetArticle(slug string) (*Article, error) {
+	var article Article
+	err := db.DB.Scopes(defaultScope).First(&article, "slug = ?", slug).Error
+	return &article, err
 }
 
 // GetAllArticles returns all articles.
@@ -85,7 +93,7 @@ func (db *DB) GetAllArticlesWithTag(tagName string) (articles []Article, err err
 
 func (db *DB) GetAllArticlesAuthoredBy(username string) (articles []Article, err error) {
 	//user := User{Username: username}
-	//db.GetUser(&user)
+	//db.FindUserByUsername(string) *Use
 	err = db.Scopes(defaultScope).
 		Joins("JOIN users ON users.id = articles.user_id").
 		Where("users.username = ?", username).
@@ -94,31 +102,56 @@ func (db *DB) GetAllArticlesAuthoredBy(username string) (articles []Article, err
 }
 
 func (db *DB) GetAllArticlesFavoritedBy(username string) (articles []Article, err error) {
-	user := User{Username: username}
-	db.GetUser(&user)
 	err = db.Scopes(defaultScope).
 		Joins("JOIN favorites ON favorites.article_id = articles.id").
-		Where("favorites.user_id = ?", user.ID).
+		Joins("JOIN users ON users.id = favorites.user_id").
+		Where("users.username = ?", username).
 		Find(&articles).Error
 	return
 }
 
-func (db *DB) IsFavorited(user *User, article *Article) bool {
-	f := Favorite{ArticleID: article.ID, UserID: uint(user.ID)}
-
-	if db.Where(f).First(&f).RecordNotFound() {
+func (db *DB) IsFavorited(userID int, articleID int) bool {
+	f := Favorite{ArticleID: articleID, UserID: userID}
+	if db.Debug().Where(f).First(&f).RecordNotFound() {
 		return false
 	}
-
 	return true
 }
 
-func (db *DB) IsFollowing(userFrom *User, userTo *User) bool {
+func (db *DB) IsFollowing(userIDFrom int, userIDTo int) bool {
 	return false
 }
 
-func (db *DB) GetUser(user *User) *gorm.DB {
-	return db.Where(user).First(&user)
+func (db *DB) FindUserByUsername(username string) (*User, error) {
+	var user User
+	err := db.First(&user).Error
+	return &user, err
+}
+
+func (db *DB) FavoriteArticle(userID int, articleID int) error {
+	var err error
+	f := Favorite{UserID: userID, ArticleID: articleID}
+
+	if !db.IsFavorited(userID, articleID) {
+		err = db.Create(&f).Error
+	} else {
+		err = fmt.Errorf("This article is already in your favorites !")
+	}
+
+	return err
+}
+
+func (db *DB) UnfavoriteArticle(userID int, articleID int) error {
+	var err error
+	f := Favorite{UserID: userID, ArticleID: articleID}
+
+	if db.IsFavorited(userID, articleID) {
+		err = db.Delete(&f).Error
+	} else {
+		err = fmt.Errorf("Cannot remove this article from your favorites. This article is not in your favorites !")
+	}
+
+	return err
 }
 
 // Callbacks

@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/JackyChiu/realworld-starter-kit/models"
@@ -15,7 +17,7 @@ type Article struct {
 	Description    string    `json:"description"`
 	Body           string    `json:"body"`
 	Favorited      bool      `json:"favorited"`
-	FavoritesCount uint      `json:"favoritesCount"`
+	FavoritesCount int       `json:"favoritesCount"`
 	TagsList       []string  `json:"tagsList"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
@@ -33,7 +35,7 @@ type ArticleJSON struct {
 
 type ArticlesJSON struct {
 	Articles      []Article `json:"articles"`
-	ArticlesCount uint      `json:"articlesCount"`
+	ArticlesCount int       `json:"articlesCount"`
 }
 
 type Author struct {
@@ -80,23 +82,24 @@ func (h *Handler) getArticle(w http.ResponseWriter, r *http.Request) {
 	h.Logger.Println("Slug: ", slug)
 
 	a, err := h.DB.GetArticle(slug)
-	
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	h.Logger.Println(a)
-
-	u := models.User{}
+	var u = &models.User{}
 	if claim, _ := h.JWT.CheckRequest(r); claim != nil {
-		u.Username = claim.Username
+		u, err = h.DB.FindUserByUsername(claim.Username)
 	}
 
-	h.DB.GetUser(&u)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
 
 	articleJSON := ArticleJSON{
-		Article: h.constructArticleJSON(&a, &u),
+		Article: h.buildArticleJSON(a, u),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -107,7 +110,7 @@ func (h *Handler) getArticle(w http.ResponseWriter, r *http.Request) {
 // getArticles handle GET /api/articles
 func (h *Handler) getArticles(w http.ResponseWriter, r *http.Request) {
 	var err error
-	var articles []models.Article
+	var articles = []models.Article{}
 
 	query := h.DB.GetAllArticles()
 
@@ -152,20 +155,23 @@ func (h *Handler) getArticles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u := &models.User{}
+	var u = &models.User{}
 	if claim, _ := h.JWT.CheckRequest(r); claim != nil {
-		u.Username = claim.Username
+		u, err = h.DB.FindUserByUsername(claim.Username)
 	}
 
-	h.DB.GetUser(u)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
 
 	var articlesJSON ArticlesJSON
 	for i := range articles {
 		a := &articles[i]
-		articlesJSON.Articles = append(articlesJSON.Articles, h.constructArticleJSON(a, u))
+		articlesJSON.Articles = append(articlesJSON.Articles, h.buildArticleJSON(a, u))
 	}
 
-	articlesJSON.ArticlesCount = uint(len(articles))
+	articlesJSON.ArticlesCount = len(articles)
 
 	json.NewEncoder(w).Encode(articlesJSON)
 }
@@ -194,9 +200,14 @@ func (h *Handler) createArticle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.Logger.Println("claim: ", claim)
+	u, err := h.DB.FindUserByUsername(claim.Username)
 
-	u := models.User{Username: claim.Username}
-	h.DB.GetUser(&u)
+	if err != nil {
+		h.Logger.Println("err: ", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
 
 	a := models.NewArticle(body.Article.Title, body.Article.Description, body.Article.Body, u)
 
@@ -211,7 +222,7 @@ func (h *Handler) createArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	articleJSON := ArticleJSON{
-		Article: h.constructArticleJSON(a, &u),
+		Article: h.buildArticleJSON(a, u),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -232,10 +243,19 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 
 	slug := path.Base(r.URL.Path)
 
-	u := models.User{Username: claim.Username}
-	h.DB.GetUser(&u)
-
 	a, err := h.DB.GetArticle(slug)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if !a.CanUpdate(claim.Username) {
+		http.Error(w, fmt.Errorf("You don't have the authorization to edit this article").Error(), http.StatusUnauthorized)
+		return
+	}
+
+	u, err := h.DB.FindUserByUsername(claim.Username)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -245,7 +265,7 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 	var body map[string]map[string]interface{}
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -270,17 +290,18 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 		a.Body = body.(string)
 	}
 
-	if err := h.DB.SaveArticle(&a); err != nil {
+	if err := h.DB.SaveArticle(a); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	articleJSON := ArticleJSON{
-		Article: h.constructArticleJSON(&a, &u),
+		Article: h.buildArticleJSON(a, u),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+
 	json.NewEncoder(w).Encode(articleJSON)
 }
 
@@ -291,22 +312,106 @@ func (h *Handler) deleteArticle(w http.ResponseWriter, r *http.Request) {
 
 // favoriteArticle handle POST /api/articles/:slug/favorite
 func (h *Handler) favoriteArticle(w http.ResponseWriter, r *http.Request) {
+	claim, err := h.JWT.CheckRequest(r)
 
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	slug := strings.Split(r.URL.Path, "/")[3]
+	h.Logger.Println("Slug: ", slug)
+
+	a, err := h.DB.GetArticle(slug)
+
+	if err != nil {
+		h.Logger.Println("Err: ", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	u, err := h.DB.FindUserByUsername(claim.Username)
+
+	if err != nil {
+		h.Logger.Println("Err: ", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	err = h.DB.FavoriteArticle(u.ID, a.ID)
+
+	articleJSON := ArticleJSON{
+		Article: h.buildArticleJSON(a, u),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err != nil {
+		h.Logger.Println("Err: ", err.Error())
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	json.NewEncoder(w).Encode(articleJSON)
 }
 
 // unFavoriteArticle handle DELETE /api/articles/:slug/favorite
 func (h *Handler) unFavoriteArticle(w http.ResponseWriter, r *http.Request) {
+	claim, err := h.JWT.CheckRequest(r)
 
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	slug := strings.Split(r.URL.Path, "/")[3]
+	h.Logger.Println("Slug: ", slug)
+
+	a, err := h.DB.GetArticle(slug)
+
+	if err != nil {
+		h.Logger.Println("Err: ", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	u, err := h.DB.FindUserByUsername(claim.Username)
+
+	if err != nil {
+		h.Logger.Println("Err: ", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	err = h.DB.UnfavoriteArticle(u.ID, a.ID)
+
+	articleJSON := ArticleJSON{
+		Article: h.buildArticleJSON(a, u),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err != nil {
+		h.Logger.Println("Err: ", err.Error())
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	json.NewEncoder(w).Encode(articleJSON)
 }
 
-func (h *Handler) constructArticleJSON(a *models.Article, u *models.User) Article {
+func (h *Handler) buildArticleJSON(a *models.Article, u *models.User) Article {
 	following := false
 	favorited := false
-
+	h.Logger.Println("\nArticle: ", a, "\nAuthor: ", a.User, "\nLogged User: ", u)
 	if (u != &models.User{}) {
-		following = h.DB.IsFollowing(u, &a.User)
-		favorited = h.DB.IsFavorited(u, a)
+		following = h.DB.IsFollowing(u.ID, a.User.ID)
+		favorited = h.DB.IsFavorited(u.ID, a.ID)
+		h.Logger.Println("isFavorited: ", favorited)
 	}
+
 	article := Article{
 		Slug:           a.Slug,
 		Title:          a.Title,

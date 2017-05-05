@@ -1,9 +1,9 @@
 package models
 
 type Favorite struct {
-	ID        uint
+	ID        int
 	User      User
-	UserID    uint
+	UserID    int
 	Article   Article
-	ArticleID uint
+	ArticleID int
 }

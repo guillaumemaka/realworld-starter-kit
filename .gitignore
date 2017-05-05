@@ -15,3 +15,8 @@
 #System Files
 .DS_Store
 Thumbs.db
+
+# Builds
+./bin
+./build
+./dist

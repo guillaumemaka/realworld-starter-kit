@@ -25,7 +25,11 @@ type article struct {
 	TagsList    []string `json:"tagsList"`
 }
 
-func NewTestHandler() *Handler {
+var (
+	h *Handler
+)
+
+func TestMain(m *testing.M) {
 	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
 
 	db, err := models.NewDB("sqlite3", "../conduit_test.db")
@@ -34,20 +38,16 @@ func NewTestHandler() *Handler {
 	}
 
 	db.InitSchema()
-
 	db.Seed()
 
 	j := auth.NewJWT()
-	return New(db, j, logger)
-}
+	h = New(db, j, logger)
 
-var (
-	h *Handler
-)
+	exit := m.Run()
 
-func TestMain(m *testing.M) {
-	h = NewTestHandler()
-	os.Exit(m.Run())
+	db.CleanDatabase()
+
+	os.Exit(exit)
 }
 
 func TestArticlesHandler_Index(t *testing.T) {

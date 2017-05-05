@@ -55,3 +55,10 @@ func (db *DB) Seed() {
 		tagIndex += 3
 	}
 }
+
+func (db *DB) CleanDatabase() {
+	db.DropTable("users")
+	db.DropTable("articles")
+	db.DropTable("tags")
+	db.DropTable("favorites")
+}

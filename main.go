@@ -23,13 +23,17 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
+
 	db.InitSchema()
+
+	db.Seed()
 
 	j := auth.NewJWT()
 	h := handlers.New(db, j, logger)
 
 	http.HandleFunc("/api/users", h.UsersHandler)
-
+	http.HandleFunc("/api/articles", h.ArticlesHandler)
+	http.HandleFunc("/api/articles/", h.ArticlesHandler)
 	err = http.ListenAndServe(PORT, nil)
 	if err != nil {
 		logger.Fatal(err)

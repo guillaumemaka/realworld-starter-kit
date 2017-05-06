@@ -1,4 +1,4 @@
-CREATE DATABASE IF NOT EXISTS conduit;
+CREATE DATABASE IF NOT EXISTS conduit CHARACTER SET utf8 COLLATE utf8_general_ci;
 
 CREATE TABLE IF NOT EXISTS `articles` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
@@ -6,11 +6,13 @@ CREATE TABLE IF NOT EXISTS `articles` (
   `title` varchar(255) NOT NULL DEFAULT '',
   `description` varchar(255) NOT NULL DEFAULT '',
   `body` text NOT NULL,
-  `created` datetime DEFAULT NULL,
-  `updated` datetime NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `author_id` int(11) unsigned NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `slug` (`slug`)
+  UNIQUE KEY `slug` (`slug`),
+  KEY `ARTICLEusrID` (`author_id`),
+  CONSTRAINT `ARTICLEusrID` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `users` (
@@ -28,7 +30,10 @@ CREATE TABLE IF NOT EXISTS `users` (
 CREATE TABLE IF NOT EXISTS `usr_art_favourite` (
   `usr_id` int(11) unsigned NOT NULL,
   `art_id` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`usr_id`,`art_id`)
+  PRIMARY KEY (`usr_id`,`art_id`),
+  KEY `FAVOURITEartID` (`art_id`),
+  CONSTRAINT `FAVOURITEartID` FOREIGN KEY (`art_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `FAVOURITEusrID` FOREIGN KEY (`usr_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `usr_following` (
@@ -36,6 +41,6 @@ CREATE TABLE IF NOT EXISTS `usr_following` (
   `usr_following_id` int(11) unsigned NOT NULL,
   PRIMARY KEY (`usr_id`,`usr_following_id`),
   KEY `following_id` (`usr_following_id`),
-  CONSTRAINT `following_id` FOREIGN KEY (`usr_following_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `user_id` FOREIGN KEY (`usr_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `FOLLOWuserID` FOREIGN KEY (`usr_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `FOLLOWusrFollowID` FOREIGN KEY (`usr_following_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

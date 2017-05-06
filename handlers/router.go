@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -10,10 +9,11 @@ import (
 
 type Route struct {
 	Pattern        string
-	ActionHandlers map[string]http.HandlerFunc
+	ActionHandlers map[string]http.Handler
 }
 
 type Router struct {
+	http.Handler
 	routes []Route
 	logger *log.Logger
 	debug  bool
@@ -34,7 +34,7 @@ func NewRouter(logger *log.Logger) *Router {
 }
 
 // AddRoute add a new route to the router
-func (r *Router) AddRoute(pattern string, method string, handler http.HandlerFunc) {
+func (r *Router) AddRoute(pattern string, method string, handler http.Handler) {
 	var found = false
 	for _, route := range r.routes {
 		if route.Pattern == pattern {
@@ -46,7 +46,7 @@ func (r *Router) AddRoute(pattern string, method string, handler http.HandlerFun
 	if !found {
 		r.routes = append(r.routes, Route{
 			Pattern: pattern,
-			ActionHandlers: map[string]http.HandlerFunc{
+			ActionHandlers: map[string]http.Handler{
 				method: handler,
 			},
 		})
@@ -57,7 +57,7 @@ func (router *Router) DebugMode(enabled bool) {
 	router.debug = enabled
 }
 
-func (router *Router) Dispatch(w http.ResponseWriter, r *http.Request) {
+func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, route := range router.routes {
 		if matched, _ := regexp.MatchString(route.Pattern, r.URL.Path); matched {
 			if h, registered := route.ActionHandlers[r.Method]; registered {
@@ -65,7 +65,7 @@ func (router *Router) Dispatch(w http.ResponseWriter, r *http.Request) {
 					router.logger.Println(r.Method, r.URL.Path)
 				}
 				r = r.WithContext(buildContext(route.Pattern, r))
-				h(w, r)
+				h.ServeHTTP(w, r)
 			} else {
 				http.NotFound(w, r)
 			}
@@ -85,10 +85,7 @@ func buildContext(pattern string, r *http.Request) context.Context {
 		for i, n := range r2[0] {
 			if n1[i] != "" {
 				ctx = context.WithValue(ctx, n1[i], n)
-				fmt.Println("Context: ", ctx)
 			}
-
-			fmt.Printf("%d. match='%s'\tname='%s'\n", i, n, n1[i])
 		}
 	}
 	return ctx

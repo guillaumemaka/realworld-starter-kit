@@ -12,6 +12,7 @@ type ScopeHandler func(db *gorm.DB) *gorm.DB
 
 type ArticleStorer interface {
 	CreateArticle(*Article) error
+	DeleteArticle(*Article) error
 	GetAllArticles() *gorm.DB
 	GetAllArticlesAuthoredBy(string) ([]Article, error)
 	GetAllArticlesFavoritedBy(string) ([]Article, error)
@@ -41,6 +42,8 @@ type Article struct {
 	UpdatedAt      time.Time
 }
 
+type ValidationMessages map[string]interface{}
+
 // NewArticle returns a new Article instance.
 func NewArticle(title string, description string, body string, user *User) *Article {
 	return &Article{
@@ -51,6 +54,29 @@ func NewArticle(title string, description string, body string, user *User) *Arti
 	}
 }
 
+// IsValid check if the article has a valid title, description and body
+func (a *Article) IsValid() (bool, map[string]interface{}) {
+	var errs = ValidationMessages{}
+	var valid = true
+
+	if a.Title == "" {
+		errs["title"] = []string{"title field can't be blank"}
+		valid = false
+	}
+
+	if a.Description == "" {
+		errs["description"] = []string{"description field can't be blank"}
+		valid = false
+	}
+
+	if a.Body == "" {
+		errs["body"] = []string{"body field can't be blank"}
+		valid = false
+	}
+
+	return valid, errs
+}
+
 func (a *Article) CanUpdate(username string) bool {
 	return a.User.Username == username
 }
@@ -58,6 +84,12 @@ func (a *Article) CanUpdate(username string) bool {
 // CreateArticle persist a new article
 func (db *DB) CreateArticle(article *Article) (err error) {
 	err = db.Create(&article).Error
+	return
+}
+
+// DeleteArticle persist a new article
+func (db *DB) DeleteArticle(article *Article) (err error) {
+	err = db.Delete(&article).Error
 	return
 }
 
@@ -112,7 +144,7 @@ func (db *DB) GetAllArticlesFavoritedBy(username string) (articles []Article, er
 
 func (db *DB) IsFavorited(userID int, articleID int) bool {
 	f := Favorite{ArticleID: articleID, UserID: userID}
-	if db.Debug().Where(f).First(&f).RecordNotFound() {
+	if db.Where(f).First(&f).RecordNotFound() {
 		return false
 	}
 	return true
@@ -124,7 +156,7 @@ func (db *DB) IsFollowing(userIDFrom int, userIDTo int) bool {
 
 func (db *DB) FindUserByUsername(username string) (*User, error) {
 	var user User
-	err := db.First(&user).Error
+	err := db.First(&user, "username = ?", username).Error
 	return &user, err
 }
 

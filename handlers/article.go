@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
-	"strings"
 	"time"
 
 	"github.com/JackyChiu/realworld-starter-kit/models"
@@ -39,6 +37,9 @@ type ArticlesJSON struct {
 	ArticlesCount int       `json:"articlesCount"`
 }
 
+type errorResponse struct {
+	Errors map[string]interface{} `json:"errors"`
+}
 type Author struct {
 	Username  string `json:"username"`
 	Bio       string `json:"bio"`
@@ -58,109 +59,103 @@ func (h *Handler) ArticlesHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Unprotected routes
 	router := NewRouter(h.Logger)
-	router.AddRoute(`articles\/?$`, "GET", h.getArticles)
+	router.AddRoute(
+		`articles\/?$`,
+		"GET", h.getCurrentUser(http.HandlerFunc(h.getArticles)))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)$`,
-		"GET", h.getCurrentUser(h.extractArticle(h.getArticle)))
+		"GET", h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.getArticle))))
 
 	// Protected routes
 	router.AddRoute(
 		`articles\/?$`,
-		"POST", h.getCurrentUser(h.authorize(h.createArticle)))
+		"POST", h.authorize(h.getCurrentUser(h.authorize(http.HandlerFunc(h.createArticle)))))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)$`,
-		"PUT", h.getCurrentUser(h.authorize(h.updateArticle)))
+		"PUT", h.authorize(h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.updateArticle)))))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)$`,
-		"DELETE", h.getCurrentUser(h.authorize(h.deleteArticle)))
+		"DELETE", h.authorize(h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.deleteArticle)))))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)\/favorite$`,
-		"POST", h.getCurrentUser(h.authorize(h.favoriteArticle)))
+		"POST", h.authorize(h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.favoriteArticle)))))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)\/favorite$`,
-		"DELETE", h.getCurrentUser(h.authorize(h.unFavoriteArticle)))
+		"DELETE", h.authorize(h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.unFavoriteArticle)))))
 
-	router.DebugMode(true)
+	//router.DebugMode(true)
 
-	router.Dispatch(w, r)
+	router.ServeHTTP(w, r)
 }
 
-func (h *Handler) getCurrentUser(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getCurrentUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		var u *models.User
+		var u = &models.User{}
 
 		if claim, _ := h.JWT.CheckRequest(r); claim != nil {
 			u, _ = h.DB.FindUserByUsername(claim.Username)
-			h.Logger.Println(contextKeyCurrentUser, u)
+			h.Logger.Println("Username: ", claim.Username, contextKeyCurrentUser, u)
 		}
 
-		if u != nil {
-			ctx = context.WithValue(ctx, contextKeyCurrentUser, u)
-			ctx = context.WithValue(ctx, contextKeyLoggedIn, true)
-		} else {
-			ctx = context.WithValue(ctx, contextKeyCurrentUser, &models.User{})
-			ctx = context.WithValue(ctx, contextKeyLoggedIn, false)
-		}
+		ctx = context.WithValue(ctx, contextKeyCurrentUser, u)
 
 		r = r.WithContext(ctx)
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
-func (h *Handler) extractArticle(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) extractArticle(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if slug, ok := ctx.Value("slug").(string); ok {
-			a, _ := h.DB.GetArticle(slug)
+			a, err := h.DB.GetArticle(slug)
+
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+
+			h.Logger.Println("Slug:", slug, "extracted article: ", a)
+			h.Logger.Println("err: ", err)
 			if a != nil {
 				ctx := r.Context()
 				ctx = context.WithValue(ctx, contextKeyArticle, a)
 				r = r.WithContext(ctx)
 			}
 		}
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
-func (h *Handler) authorize(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if loggedIn, _ := r.Context().Value(contextKeyLoggedIn).(bool); !loggedIn {
-			w.WriteHeader(http.StatusUnauthorized)
+func (h *Handler) authorize(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := h.JWT.CheckRequest(r); err != nil {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
-		next(w, r)
-	}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // getArticle handle GET /api/articles/:slug
 func (h *Handler) getArticle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	slug, _ := ctx.Value("slug").(string)
-
-	h.Logger.Println("Slug: ", slug)
-
-	a, ok := ctx.Value(contextKeyArticle).(*models.Article)
-
-	if !ok {
-		http.Error(w, fmt.Errorf("Article not found with slug %s", slug).Error(), http.StatusNotFound)
-		return
-	}
-
-	u, _ := ctx.Value(contextKeyCurrentUser).(*models.User)
+	a := ctx.Value(contextKeyArticle).(*models.Article)
+	u := ctx.Value(contextKeyCurrentUser).(*models.User)
 
 	articleJSON := ArticleJSON{
 		Article: h.buildArticleJSON(a, u),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-
 	json.NewEncoder(w).Encode(articleJSON)
 }
 
@@ -251,14 +246,17 @@ func (h *Handler) createArticle(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	u, _ := r.Context().Value(contextKeyCurrentUser).(*models.User)
-
-	if u == nil {
-		http.Error(w, fmt.Errorf("User not found").Error(), http.StatusNotFound)
-		return
-	}
+	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
 
 	a := models.NewArticle(body.Article.Title, body.Article.Description, body.Article.Body, u)
+
+	if valid, errs := a.IsValid(); !valid {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		errorResponse := errorResponse{Errors: errs}
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
 
 	for _, tagName := range body.Article.TagsList {
 		tag, _ := h.DB.FindTagOrInit(tagName)
@@ -281,33 +279,16 @@ func (h *Handler) createArticle(w http.ResponseWriter, r *http.Request) {
 
 // updateArticle handle PUT /api/articles/:slug
 func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
-	claim, err := h.JWT.CheckRequest(r)
+	var err error
+	a := r.Context().Value(contextKeyArticle).(*models.Article)
+	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
 
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	h.Logger.Println("Slug: ", r.Context().Value("slug").(string), "Article: ", a, "Author: ", a.User, "CurrenUser: ", u)
 
-	defer r.Body.Close()
-
-	slug := path.Base(r.URL.Path)
-
-	a, err := h.DB.GetArticle(slug)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	if !a.CanUpdate(claim.Username) {
-		http.Error(w, fmt.Errorf("You don't have the authorization to edit this article").Error(), http.StatusUnauthorized)
-		return
-	}
-
-	u, err := h.DB.FindUserByUsername(claim.Username)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	if !a.CanUpdate(u.Username) {
+		err = fmt.Errorf("You don't have the permission to edit this article")
+		h.Logger.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
 
@@ -317,6 +298,8 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
+
+	defer r.Body.Close()
 
 	var article map[string]interface{}
 
@@ -339,6 +322,14 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 		a.Body = body.(string)
 	}
 
+	if valid, errs := a.IsValid(); !valid {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		errorResponse := errorResponse{Errors: errs}
+		json.NewEncoder(w).Encode(errorResponse)
+		return
+	}
+
 	if err := h.DB.SaveArticle(a); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -356,38 +347,33 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 
 // deleteArticle handle DELETE /api/articles/:slug
 func (h *Handler) deleteArticle(w http.ResponseWriter, r *http.Request) {
+	var err error
+	a := r.Context().Value(contextKeyArticle).(*models.Article)
+	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
 
+	if !a.CanUpdate(u.Username) {
+		err = fmt.Errorf("You don't have the permission to delete this article")
+		h.Logger.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+
+	err = h.DB.DeleteArticle(a)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // favoriteArticle handle POST /api/articles/:slug/favorite
 func (h *Handler) favoriteArticle(w http.ResponseWriter, r *http.Request) {
-	claim, err := h.JWT.CheckRequest(r)
+	a := r.Context().Value(contextKeyArticle).(*models.Article)
+	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
 
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	slug := strings.Split(r.URL.Path, "/")[3]
-	h.Logger.Println("Slug: ", slug)
-
-	a, err := h.DB.GetArticle(slug)
-
-	if err != nil {
-		h.Logger.Println("Err: ", err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	u, err := h.DB.FindUserByUsername(claim.Username)
-
-	if err != nil {
-		h.Logger.Println("Err: ", err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	err = h.DB.FavoriteArticle(u.ID, a.ID)
+	err := h.DB.FavoriteArticle(u.ID, a.ID)
 
 	articleJSON := ArticleJSON{
 		Article: h.buildArticleJSON(a, u),
@@ -396,7 +382,6 @@ func (h *Handler) favoriteArticle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if err != nil {
-		h.Logger.Println("Err: ", err.Error())
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -407,33 +392,10 @@ func (h *Handler) favoriteArticle(w http.ResponseWriter, r *http.Request) {
 
 // unFavoriteArticle handle DELETE /api/articles/:slug/favorite
 func (h *Handler) unFavoriteArticle(w http.ResponseWriter, r *http.Request) {
-	claim, err := h.JWT.CheckRequest(r)
+	a := r.Context().Value(contextKeyArticle).(*models.Article)
+	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
 
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	slug := strings.Split(r.URL.Path, "/")[3]
-	h.Logger.Println("Slug: ", slug)
-
-	a, err := h.DB.GetArticle(slug)
-
-	if err != nil {
-		h.Logger.Println("Err: ", err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	u, err := h.DB.FindUserByUsername(claim.Username)
-
-	if err != nil {
-		h.Logger.Println("Err: ", err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	err = h.DB.UnfavoriteArticle(u.ID, a.ID)
+	err := h.DB.UnfavoriteArticle(u.ID, a.ID)
 
 	articleJSON := ArticleJSON{
 		Article: h.buildArticleJSON(a, u),
@@ -442,7 +404,6 @@ func (h *Handler) unFavoriteArticle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if err != nil {
-		h.Logger.Println("Err: ", err.Error())
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	} else {
 		w.WriteHeader(http.StatusOK)
@@ -458,7 +419,6 @@ func (h *Handler) buildArticleJSON(a *models.Article, u *models.User) Article {
 	if (u != &models.User{}) {
 		following = h.DB.IsFollowing(u.ID, a.User.ID)
 		favorited = h.DB.IsFavorited(u.ID, a.ID)
-		h.Logger.Println("isFavorited: ", favorited)
 	}
 
 	article := Article{

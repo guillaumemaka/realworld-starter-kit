@@ -55,7 +55,8 @@ func storeJWTUserCtx(token string, r *http.Request) (context.Context, error) {
 func getUserFromContext(r *http.Request) (*models.User, error) {
 	ctx := r.Context()
 	u, ok := ctx.Value(userKey).(*models.User)
-	if !ok {
+	// check if u==nil first because we don't care if ok is true/false if u is nil
+	if u != nil && !ok {
 		return nil, fmt.Errorf("Can't get user from context")
 	}
 	return u, nil
@@ -64,7 +65,8 @@ func getUserFromContext(r *http.Request) (*models.User, error) {
 func getTokenFromContext(r *http.Request) (string, error) {
 	ctx := r.Context()
 	token, ok := ctx.Value(tokenKey).(string)
-	if !ok {
+	// check if token=="" first because we don't care if ok is true/false if token is ""
+	if token != "" && !ok {
 		return "", fmt.Errorf("Can't get token from context")
 	}
 	return token, nil

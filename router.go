@@ -25,29 +25,30 @@ func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
 	})
 
 	api := r.PathPrefix("/api").Subrouter()
-	// TODO
+
 	// Unprotected Routes
 	api.Handle("/users", hfn.Register(&env)).Methods("POST").Name("Registration")
 	api.Handle("/users/login", hfn.Login(&env)).Methods("POST").Name("Authentication")
+	// TODO
 	api.Handle("/tags", na).Methods("GET").Name("Get Tags")
 	api.Handle("/articles/{slug}", na).Methods("GET").Name("Get Article")
 
-	// TODO
 	// OPTIONAL Auth - What does that mean how to implement?
 	// First thought is to write 2 sets of middleware
 	//   JWT2Ctx - will validate JWT if present and will add user from valid JWT into request context
 	//   MustHaveUser - will check the request context for the presence of a user and will redirect if not present
 	//
+	api.Handle("/profiles/{username}", hfn.GetProfile(&env)).Methods("GET").Name("Get Profile")
+	// TODO
 	api.Handle("/articles/{slug}/comments", na).Methods("GET").Name("Get Comments from an Article")
 	api.Handle("/articles", na).Methods("GET").Name("List Articles")
-	api.Handle("/profiles/{username}", na).Methods("GET").Name("Get Profile")
 
-	// TODO
 	// Protected Routes
 	api.Handle("/user", hfn.MustHaveUser(hfn.GetCurrentUser(&env).(hfn.AppHandler))).Methods("GET").Name("Get Current User")
 	api.Handle("/user", hfn.MustHaveUser(hfn.UpdateUser(&env).(hfn.AppHandler))).Methods("PUT").Name("Update User")
-	api.Handle("/profiles/{username}/follow", na).Methods("POST").Name("Follow User")
-	api.Handle("/profiles/{username}/follow", na).Methods("Delete").Name("Delete User")
+	// TODO
+	api.Handle("/profiles/{username}/follow", hfn.MustHaveUser(hfn.FollowUser(&env).(hfn.AppHandler))).Methods("POST").Name("Follow User")
+	api.Handle("/profiles/{username}/follow", hfn.MustHaveUser(hfn.UnfollowUser(&env).(hfn.AppHandler))).Methods("DELETE").Name("Unfollow User")
 	api.Handle("/articles/feed", na).Methods("GET").Name("Feed Articles")
 	api.Handle("/articles", na).Methods("POST").Name("Create Article")
 	api.Handle("/articles/{slug}", na).Methods("PUT").Name("Update Article")

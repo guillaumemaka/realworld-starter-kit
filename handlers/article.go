@@ -70,7 +70,7 @@ func (h *Handler) ArticlesHandler(w http.ResponseWriter, r *http.Request) {
 	// Protected routes
 	router.AddRoute(
 		`articles\/?$`,
-		"POST", h.authorize(h.getCurrentUser(h.authorize(http.HandlerFunc(h.createArticle)))))
+		"POST", h.authorize(h.getCurrentUser(http.HandlerFunc(h.createArticle))))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)$`,
@@ -100,7 +100,6 @@ func (h *Handler) getCurrentUser(next http.Handler) http.Handler {
 
 		if claim, _ := h.JWT.CheckRequest(r); claim != nil {
 			u, _ = h.DB.FindUserByUsername(claim.Username)
-			h.Logger.Println("Username: ", claim.Username, contextKeyCurrentUser, u)
 		}
 
 		ctx = context.WithValue(ctx, contextKeyCurrentUser, u)
@@ -121,8 +120,6 @@ func (h *Handler) extractArticle(next http.Handler) http.Handler {
 				return
 			}
 
-			h.Logger.Println("Slug:", slug, "extracted article: ", a)
-			h.Logger.Println("err: ", err)
 			if a != nil {
 				ctx := r.Context()
 				ctx = context.WithValue(ctx, contextKeyArticle, a)
@@ -283,11 +280,8 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 	a := r.Context().Value(contextKeyArticle).(*models.Article)
 	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
 
-	h.Logger.Println("Slug: ", r.Context().Value("slug").(string), "Article: ", a, "Author: ", a.User, "CurrenUser: ", u)
-
 	if !a.IsOwnedBy(u.Username) {
 		err = fmt.Errorf("You don't have the permission to edit this article")
-		h.Logger.Println(err.Error())
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
@@ -353,7 +347,6 @@ func (h *Handler) deleteArticle(w http.ResponseWriter, r *http.Request) {
 
 	if !a.IsOwnedBy(u.Username) {
 		err = fmt.Errorf("You don't have the permission to delete this article")
-		h.Logger.Println(err.Error())
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
@@ -415,7 +408,7 @@ func (h *Handler) unFavoriteArticle(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) buildArticleJSON(a *models.Article, u *models.User) Article {
 	following := false
 	favorited := false
-	//h.Logger.Println("\nArticle: ", a, "\nAuthor: ", a.User, "\nLogged User: ", u)
+
 	if (u != &models.User{}) {
 		following = h.DB.IsFollowing(u.ID, a.User.ID)
 		favorited = h.DB.IsFavorited(u.ID, a.ID)

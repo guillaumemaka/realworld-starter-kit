@@ -285,7 +285,7 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 
 	h.Logger.Println("Slug: ", r.Context().Value("slug").(string), "Article: ", a, "Author: ", a.User, "CurrenUser: ", u)
 
-	if !a.CanUpdate(u.Username) {
+	if !a.IsOwnedBy(u.Username) {
 		err = fmt.Errorf("You don't have the permission to edit this article")
 		h.Logger.Println(err.Error())
 		http.Error(w, err.Error(), http.StatusForbidden)
@@ -351,7 +351,7 @@ func (h *Handler) deleteArticle(w http.ResponseWriter, r *http.Request) {
 	a := r.Context().Value(contextKeyArticle).(*models.Article)
 	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
 
-	if !a.CanUpdate(u.Username) {
+	if !a.IsOwnedBy(u.Username) {
 		err = fmt.Errorf("You don't have the permission to delete this article")
 		h.Logger.Println(err.Error())
 		http.Error(w, err.Error(), http.StatusForbidden)

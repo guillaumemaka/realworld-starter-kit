@@ -70,6 +70,7 @@ func TestArticlesHandler_Index(t *testing.T) {
 
 	var articles ArticlesJSON
 	json.NewDecoder(recorder.Body).Decode(&articles)
+
 	expected := 5
 	if len(articles.Articles) != expected {
 		t.Errorf("should return a list of articles: got %v want %v", len(articles.Articles), expected)
@@ -369,7 +370,7 @@ func TestArticlesHandler_CreateWithEmptyBody(t *testing.T) {
 
 	var errorResponse errorResponse
 	json.NewDecoder(recorder.Body).Decode(&errorResponse)
-	h.Logger.Println("errorResponse: ", errorResponse)
+
 	if _, present := errorResponse.Errors["body"]; !present {
 		t.Errorf("should return an error on the article body field: got %v wamt %v", present, true)
 	}
@@ -509,7 +510,7 @@ func TestArticlesHandler_FavoriteTwice(t *testing.T) {
 	if Code := recorder.Code; Code != http.StatusUnprocessableEntity {
 		t.Errorf("should get a 422 status code: got %v wamt %v", Code, http.StatusUnprocessableEntity)
 	}
-	h.Logger.Println(articleResponse)
+
 	if articleResponse.Article.Favorited != true {
 		t.Errorf("article should be in the same state: got %v wamt %v", articleResponse.Article.Favorited, true)
 	}
@@ -563,7 +564,7 @@ func TestArticlesHandler_UnfavoriteTwice(t *testing.T) {
 	if Code := recorder.Code; Code != http.StatusUnprocessableEntity {
 		t.Errorf("should get a 422 status code: got %v wamt %v", Code, http.StatusUnprocessableEntity)
 	}
-	h.Logger.Println(articleResponse)
+
 	if articleResponse.Article.Favorited != false {
 		t.Errorf("article should be in the same state: got %v wamt %v", articleResponse.Article.Favorited, false)
 	}

@@ -77,7 +77,7 @@ func (a *Article) IsValid() (bool, map[string]interface{}) {
 	return valid, errs
 }
 
-func (a *Article) CanUpdate(username string) bool {
+func (a *Article) IsOwnedBy(username string) bool {
 	return a.User.Username == username
 }
 

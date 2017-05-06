@@ -26,9 +26,6 @@ func main() {
 
 	db.InitSchema()
 
-	db.Seed()
-	db.InitSchema()
-
 	j := auth.NewJWT()
 	h := handlers.New(db, j, logger)
 

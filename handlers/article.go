@@ -20,12 +20,18 @@ type Article struct {
 	TagsList       []string  `json:"tagsList"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
-	Author         struct {
-		Username  string `json:"username"`
-		Bio       string `json:"bio"`
-		Image     string `json:"image"`
-		Following bool   `json:"following"`
-	} `json:"user"`
+	Author         Author    `json:"user"`
+}
+
+type Author struct {
+	Username  string `json:"username"`
+	Bio       string `json:"bio"`
+	Image     string `json:"image"`
+	Following bool   `json:"following"`
+}
+
+type errorResponse struct {
+	Errors map[string]interface{} `json:"errors"`
 }
 
 type ArticleJSON struct {
@@ -37,80 +43,69 @@ type ArticlesJSON struct {
 	ArticlesCount int       `json:"articlesCount"`
 }
 
-type errorResponse struct {
-	Errors map[string]interface{} `json:"errors"`
-}
-type Author struct {
-	Username  string `json:"username"`
-	Bio       string `json:"bio"`
-	Image     string `json:"image"`
-	Following bool   `json:"following"`
-}
-
 const (
-	contextKeyCurrentUser = contextKey("current_user")
-	contextKeyArticle     = contextKey("article")
-	contextKeyLoggedIn    = contextKey("logged_in")
+	CurrentUser    = contextKey("current_user")
+	FetchedArticle = contextKey("article")
+	Claim          = contextKey("claim")
 )
 
 // ArticlesHandler handle /api/articles
 func (h *Handler) ArticlesHandler(w http.ResponseWriter, r *http.Request) {
-	//h.Logger.Println(r.Method, r.URL.Path)
-
 	// Unprotected routes
 	router := NewRouter(h.Logger)
 	router.AddRoute(
 		`articles\/?$`,
-		"GET", h.getCurrentUser(http.HandlerFunc(h.getArticles)))
+		"GET", h.getCurrentUser(h.getArticles))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)$`,
-		"GET", h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.getArticle))))
+		"GET", h.getCurrentUser(h.extractArticle(h.getArticle)))
 
 	// Protected routes
 	router.AddRoute(
 		`articles\/?$`,
-		"POST", h.authorize(h.getCurrentUser(http.HandlerFunc(h.createArticle))))
+		"POST", h.getCurrentUser(h.authorize(h.createArticle)))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)$`,
-		"PUT", h.authorize(h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.updateArticle)))))
+		"PUT", h.getCurrentUser(h.authorize(h.extractArticle(h.updateArticle))))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)$`,
-		"DELETE", h.authorize(h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.deleteArticle)))))
+		"DELETE", h.getCurrentUser(h.authorize(h.extractArticle(h.deleteArticle))))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)\/favorite$`,
-		"POST", h.authorize(h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.favoriteArticle)))))
+		"POST", h.getCurrentUser(h.authorize(h.extractArticle(h.favoriteArticle))))
 
 	router.AddRoute(
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)\/favorite$`,
-		"DELETE", h.authorize(h.getCurrentUser(h.extractArticle(http.HandlerFunc(h.unFavoriteArticle)))))
+		"DELETE", h.getCurrentUser(h.authorize(h.extractArticle(h.unFavoriteArticle))))
 
 	//router.DebugMode(true)
 
 	router.ServeHTTP(w, r)
 }
 
-func (h *Handler) getCurrentUser(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+func (h *Handler) getCurrentUser(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		var u = &models.User{}
+		ctx := r.Context()
 
 		if claim, _ := h.JWT.CheckRequest(r); claim != nil {
 			u, _ = h.DB.FindUserByUsername(claim.Username)
+			ctx = context.WithValue(ctx, Claim, claim)
 		}
 
-		ctx = context.WithValue(ctx, contextKeyCurrentUser, u)
+		ctx = context.WithValue(ctx, CurrentUser, u)
 
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
-	})
+	}
 }
 
-func (h *Handler) extractArticle(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) extractArticle(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if slug, ok := ctx.Value("slug").(string); ok {
 			a, err := h.DB.GetArticle(slug)
@@ -122,31 +117,30 @@ func (h *Handler) extractArticle(next http.Handler) http.Handler {
 
 			if a != nil {
 				ctx := r.Context()
-				ctx = context.WithValue(ctx, contextKeyArticle, a)
+				ctx = context.WithValue(ctx, FetchedArticle, a)
 				r = r.WithContext(ctx)
 			}
 		}
 		next.ServeHTTP(w, r)
-	})
+	}
 }
 
-func (h *Handler) authorize(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, err := h.JWT.CheckRequest(r); err != nil {
+func (h *Handler) authorize(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if claim := r.Context().Value(Claim); claim == nil {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
 
 		next.ServeHTTP(w, r)
-	})
+	}
 }
 
-// getArticle handle GET /api/articles/:slug
 func (h *Handler) getArticle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	a := ctx.Value(contextKeyArticle).(*models.Article)
-	u := ctx.Value(contextKeyCurrentUser).(*models.User)
+	a := ctx.Value(FetchedArticle).(*models.Article)
+	u := ctx.Value(CurrentUser).(*models.User)
 
 	articleJSON := ArticleJSON{
 		Article: h.buildArticleJSON(a, u),
@@ -243,7 +237,7 @@ func (h *Handler) createArticle(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
+	u := r.Context().Value(CurrentUser).(*models.User)
 
 	a := models.NewArticle(body.Article.Title, body.Article.Description, body.Article.Body, u)
 
@@ -277,8 +271,8 @@ func (h *Handler) createArticle(w http.ResponseWriter, r *http.Request) {
 // updateArticle handle PUT /api/articles/:slug
 func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 	var err error
-	a := r.Context().Value(contextKeyArticle).(*models.Article)
-	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
+	a := r.Context().Value(FetchedArticle).(*models.Article)
+	u := r.Context().Value(CurrentUser).(*models.User)
 
 	if !a.IsOwnedBy(u.Username) {
 		err = fmt.Errorf("You don't have the permission to edit this article")
@@ -295,28 +289,29 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	var article map[string]interface{}
-
 	if _, present := body["article"]; !present {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
+	var article map[string]interface{}
+
 	article = body["article"]
 
-	if title, present := article["title"]; present && a.Title != title {
+	if title, present := article["title"]; present {
 		a.Title = title.(string)
 	}
 
-	if description, present := article["description"]; present && a.Description != description {
+	if description, present := article["description"]; present {
 		a.Description = description.(string)
 	}
 
-	if body, present := article["body"]; present && a.Body != body {
+	if body, present := article["body"]; present {
 		a.Body = body.(string)
 	}
 
 	if valid, errs := a.IsValid(); !valid {
+		h.Logger.Println(errs)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		errorResponse := errorResponse{Errors: errs}
@@ -342,8 +337,8 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 // deleteArticle handle DELETE /api/articles/:slug
 func (h *Handler) deleteArticle(w http.ResponseWriter, r *http.Request) {
 	var err error
-	a := r.Context().Value(contextKeyArticle).(*models.Article)
-	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
+	a := r.Context().Value(FetchedArticle).(*models.Article)
+	u := r.Context().Value(CurrentUser).(*models.User)
 
 	if !a.IsOwnedBy(u.Username) {
 		err = fmt.Errorf("You don't have the permission to delete this article")
@@ -363,8 +358,8 @@ func (h *Handler) deleteArticle(w http.ResponseWriter, r *http.Request) {
 
 // favoriteArticle handle POST /api/articles/:slug/favorite
 func (h *Handler) favoriteArticle(w http.ResponseWriter, r *http.Request) {
-	a := r.Context().Value(contextKeyArticle).(*models.Article)
-	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
+	a := r.Context().Value(FetchedArticle).(*models.Article)
+	u := r.Context().Value(CurrentUser).(*models.User)
 
 	err := h.DB.FavoriteArticle(u.ID, a.ID)
 
@@ -385,8 +380,8 @@ func (h *Handler) favoriteArticle(w http.ResponseWriter, r *http.Request) {
 
 // unFavoriteArticle handle DELETE /api/articles/:slug/favorite
 func (h *Handler) unFavoriteArticle(w http.ResponseWriter, r *http.Request) {
-	a := r.Context().Value(contextKeyArticle).(*models.Article)
-	u := r.Context().Value(contextKeyCurrentUser).(*models.User)
+	a := r.Context().Value(FetchedArticle).(*models.Article)
+	u := r.Context().Value(CurrentUser).(*models.User)
 
 	err := h.DB.UnfavoriteArticle(u.ID, a.ID)
 

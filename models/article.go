@@ -8,8 +8,6 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-type ScopeHandler func(db *gorm.DB) *gorm.DB
-
 type ArticleStorer interface {
 	CreateArticle(*Article) error
 	DeleteArticle(*Article) error
@@ -26,7 +24,7 @@ type ArticleStorer interface {
 	SaveArticle(*Article) error
 }
 
-// Article article model
+// Article the article model
 type Article struct {
 	ID             int
 	Slug           string
@@ -77,6 +75,7 @@ func (a *Article) IsValid() (bool, map[string]interface{}) {
 	return valid, errs
 }
 
+// IsOwnedBy check if the article is owned by the given username
 func (a *Article) IsOwnedBy(username string) bool {
 	return a.User.Username == username
 }
@@ -93,6 +92,7 @@ func (db *DB) DeleteArticle(article *Article) (err error) {
 	return
 }
 
+// SaveArticle save an article to the database.
 func (db *DB) SaveArticle(article *Article) (err error) {
 	err = db.Save(&article).Error
 	return
@@ -107,25 +107,19 @@ func (db *DB) GetArticle(slug string) (*Article, error) {
 
 // GetAllArticles returns all articles.
 func (db *DB) GetAllArticles() *gorm.DB {
-	return db.DB.Scopes(defaultScope)
+	return db.Scopes(defaultScope)
 }
 
 func (db *DB) GetAllArticlesWithTag(tagName string) (articles []Article, err error) {
-	//tag := Tag{Name: tagName}
-	//db.FindTag(&tag)
-	err = db. //DB.Model(&tag).
-			Scopes(defaultScope).
-			Joins("JOIN taggings ON taggings.article_id = articles.id").
-			Joins("JOIN tags ON tags.id = taggings.tag_id").
-			Where("tags.name = ?", tagName).
-			Find(&articles).Error
-	//Related(&articles, "Articles").Error
+	err = db.Scopes(defaultScope).
+		Joins("JOIN taggings ON taggings.article_id = articles.id").
+		Joins("JOIN tags ON tags.id = taggings.tag_id").
+		Where("tags.name = ?", tagName).
+		Find(&articles).Error
 	return
 }
 
 func (db *DB) GetAllArticlesAuthoredBy(username string) (articles []Article, err error) {
-	//user := User{Username: username}
-	//db.FindUserByUsername(string) *Use
 	err = db.Scopes(defaultScope).
 		Joins("JOIN users ON users.id = articles.user_id").
 		Where("users.username = ?", username).
@@ -151,6 +145,7 @@ func (db *DB) IsFavorited(userID int, articleID int) bool {
 }
 
 func (db *DB) IsFollowing(userIDFrom int, userIDTo int) bool {
+	// TODO
 	return false
 }
 

@@ -33,12 +33,22 @@ func NewRouter(logger *log.Logger) *Router {
 	}
 }
 
-// AddRoute add a new route to the router
+// AddRoute add a new route to the router for the given pattern, method and http.Handler
+// Example:
+// h:=http.HandlerFunc(func(w http.ResponseWriter, r *http.Request){
+// 	id:=r.Context().Value("id").(int)
+//})
+//
+// r :=  router.NewRouter(l)
+// To handle /blog/:id
+// r.AddRoute(`\/blog\/(?P<id>[0-9]+$`, h)
+// The id will be availabl in the http.Request Context passed to your handler
 func (r *Router) AddRoute(pattern string, method string, handler http.Handler) {
 	var found = false
 	for _, route := range r.routes {
 		if route.Pattern == pattern {
 			found = true
+			// Maybe return an error and not replace the old route
 			route.ActionHandlers[method] = handler
 		}
 	}
@@ -53,8 +63,9 @@ func (r *Router) AddRoute(pattern string, method string, handler http.Handler) {
 	}
 }
 
-func (router *Router) DebugMode(enabled bool) {
-	router.debug = enabled
+// DebugMode enable debug, print some information about the handled request
+func (r *Router) DebugMode(enabled bool) {
+	r.debug = enabled
 }
 
 func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {

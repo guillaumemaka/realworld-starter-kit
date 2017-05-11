@@ -1,14 +1,14 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
 	"strings"
 	"time"
-
-	hashids "github.com/speps/go-hashids"
 
 	sq "gopkg.in/Masterminds/squirrel.v1"
 )
@@ -101,13 +101,14 @@ func (a *Article) CreateSlug() error {
 	if a.Title == "" {
 		return fmt.Errorf("Title has not been set")
 	}
-	n := time.Now().UTC().UnixNano()
-	hd := hashids.NewData()
-	//hd.Salt = "Conduit"
-	hd.MinLength = 6
-	h := hashids.NewWithData(hd)
-	cde, _ := h.Encode([]int{int(n)})
-	a.Slug = slug(a.Title + "-" + cde)
+	// Random 6 char code at end of slug to allow duplicate titles
+	buf := make([]byte, 3)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return err
+	}
+	hx := hex.EncodeToString(buf)
+	a.Slug = slug(a.Title + "-" + hx)
 	return nil
 }
 func slug(t string) string {

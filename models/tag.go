@@ -11,6 +11,11 @@ func (t Tag) String() string {
 	return string(t)
 }
 
+// TagJSONResponse is a wrapper for returning a list of Tags
+type TagJSONResponse struct {
+	Tags []Tag `json:"tags"`
+}
+
 const (
 	qCreateTag      = "INSERT INTO art_tags (tag,art_id) VALUES (?,?)"
 	qReadTags       = "SELECT DISTINCT tag from art_tags"
@@ -70,24 +75,6 @@ func removeDuplicateTags(l []Tag) []Tag {
 		}
 	}
 	return newList
-}
-
-// GetTagsForArticle does what it says on the tin
-func (adb *AppDB) GetTagsForArticle(a *Article) (tags []Tag, err error) {
-	tags = make([]Tag, 0)
-	rows, err := adb.DB.Query(qGetArticleTags, a.ID)
-	if err != nil {
-		return tags, nil
-	}
-	for rows.Next() {
-		str := ""
-		err = rows.Scan(&str)
-		if err != nil {
-			return
-		}
-		tags = append(tags, Tag(str))
-	}
-	return
 }
 
 // GetAllTags returns the distinct list of tags

@@ -45,16 +45,17 @@ func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
 	api.Handle("/articles/{slug}", hfn.MustHaveUser(hfn.UpdateArticle(&env).(hfn.AppHandler))).Methods("PUT").Name("Update Article")
 	api.Handle("/articles/{slug}", hfn.MustHaveUser(hfn.DeleteArticle(&env).(hfn.AppHandler))).Methods("DELETE").Name("Delete Article")
 
-	// TODO
-	// Unprotected Routes
-	api.Handle("/tags", na).Methods("GET").Name("Get Tags")
+	// Tags routes
+	api.Handle("/tags", hfn.GetTags(&env)).Methods("GET").Name("Get Tags")
+
+	// TODO Comments Routes
 	// OPTIONAL Auth - What does that mean how to implement?
 	api.Handle("/articles/{slug}/comments", na).Methods("GET").Name("Get Comments from an Article")
 	// Protected Routes
-	api.Handle("/articles/{slug}/favourite", na).Methods("POST").Name("Favourite Article")
-	api.Handle("/articles/{slug}/favourite", na).Methods("DELETE").Name("Unavourite Article")
 	api.Handle("/articles/{slug}/comments", na).Methods("POST").Name("Add Comments to an Article")
 	api.Handle("/articles/{slug}/comments/{id}", na).Methods("DELETE").Name("Delete Comment")
+	api.Handle("/articles/{slug}/favourite", na).Methods("POST").Name("Favourite Article")
+	api.Handle("/articles/{slug}/favourite", na).Methods("DELETE").Name("Unavourite Article")
 
 	jwtRouter := hfn.Jwt2Ctx{Env: &env, Fn: r}
 	return handlers.RecoveryHandler()(handlers.CombinedLoggingHandler(os.Stdout, jwtRouter))

@@ -37,7 +37,7 @@ API route status
 - [ ] Delete Comment (`DELETE /api/articles/:slug/comments/:id`)
 - [ ] Favourite Article (`POST /api/articles/:slug/favorite`)
 - [ ] Unfavourite Article (`DELETE /api/articles/:slug/favorite`)
-- [ ] Get Tags (`GET /api/tags`)
+- [x] Get Tags (`GET /api/tags`)
 
 ## Post API completion
 - [ ] Better error / response handling

@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
+	"strconv"
 )
 
 type Route struct {
@@ -26,10 +29,16 @@ func (c contextKey) String() string {
 }
 
 func NewRouter(logger *log.Logger) *Router {
+	logger.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	debug, err := strconv.ParseBool(os.Getenv("DEBUG"))
+	if err != nil {
+		debug = false
+	}
+
 	return &Router{
 		routes: make([]Route, 0),
 		logger: logger,
-		debug:  false,
+		debug:  debug,
 	}
 }
 
@@ -73,7 +82,7 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if matched, _ := regexp.MatchString(route.Pattern, r.URL.Path); matched {
 			if h, registered := route.ActionHandlers[r.Method]; registered {
 				if router.debug {
-					router.logger.Println(r.Method, r.URL.Path)
+					router.trace(r)
 				}
 				r = r.WithContext(buildContext(route.Pattern, r))
 				h.ServeHTTP(w, r)
@@ -85,6 +94,18 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Private Method															 //
+///////////////////////////////////////////////////////////////////////////////
+
+// buildContext extracl all reqex named matches from the request url path
+// and make it available through the request context
+//
+// Example:
+// Pattern: "\/blog\/(?P<id>[0-9]+)$"
+// Match URL: /blog/123
+//
+// Context will contain a key 'id' with the value '123'
 func buildContext(pattern string, r *http.Request) context.Context {
 	re := regexp.MustCompile(pattern)
 	n1 := re.SubexpNames()
@@ -100,4 +121,9 @@ func buildContext(pattern string, r *http.Request) context.Context {
 		}
 	}
 	return ctx
+}
+
+func (r *Router) trace(req *http.Request) {
+	debugLine := fmt.Sprintf("%v %v %v", req.RemoteAddr, req.Method, req.URL.Path)
+	r.logger.Println(debugLine)
 }

@@ -51,8 +51,9 @@ const (
 
 // ArticlesHandler handle /api/articles
 func (h *Handler) ArticlesHandler(w http.ResponseWriter, r *http.Request) {
-	// Unprotected routes
 	router := NewRouter(h.Logger)
+
+	// Unprotected routes
 	router.AddRoute(
 		`articles\/?$`,
 		"GET", h.getCurrentUser(h.getArticles))
@@ -82,18 +83,22 @@ func (h *Handler) ArticlesHandler(w http.ResponseWriter, r *http.Request) {
 		`articles\/(?P<slug>[0-9a-zA-Z\-]+)\/favorite$`,
 		"DELETE", h.getCurrentUser(h.authorize(h.extractArticle(h.unFavoriteArticle))))
 
-	//router.DebugMode(true)
-
 	router.ServeHTTP(w, r)
 }
 
 func (h *Handler) getCurrentUser(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var err error
 		var u = &models.User{}
 		ctx := r.Context()
 
 		if claim, _ := h.JWT.CheckRequest(r); claim != nil {
-			u, _ = h.DB.FindUserByUsername(claim.Username)
+			// Check also that user exists and prevent old token usage
+			// to gain privillege access.
+			if u, err = h.DB.FindUserByUsername(claim.Username); err != nil {
+				http.Error(w, fmt.Sprint("User with username", claim.Username, "doesn't exist !"), http.StatusUnauthorized)
+				return
+			}
 			ctx = context.WithValue(ctx, Claim, claim)
 		}
 
@@ -127,12 +132,15 @@ func (h *Handler) extractArticle(next http.HandlerFunc) http.HandlerFunc {
 
 func (h *Handler) authorize(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if claim := r.Context().Value(Claim); claim == nil {
+		if claim := r.Context().Value(Claim); claim != nil {
+			if currentUser := r.Context().Value(CurrentUser).(*models.User); (currentUser == &models.User{}) {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		} else {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
 		}
-
-		next.ServeHTTP(w, r)
 	}
 }
 
@@ -155,39 +163,20 @@ func (h *Handler) getArticles(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var articles = []models.Article{}
 
-	query := h.DB.GetAllArticles()
+	query := h.DB.GetAllArticles().Debug()
 
 	r.ParseForm()
-	queryParams := r.Form
 
-	if limit, ok := queryParams["limit"]; ok {
-		query = query.Limit(limit[0])
-	} else {
-		query = query.Limit(20)
-	}
-
-	if offset, ok := queryParams["offset"]; ok {
-		query = query.Offset(offset[0])
-	} else {
-		query = query.Offset(0)
-	}
+	query = h.DB.Limit(query, r.Form)
+	query = h.DB.Offset(query, r.Form)
+	query = h.DB.FilterByTag(query, r.Form)
+	query = h.DB.FilterAuthoredBy(query, r.Form)
+	query = h.DB.FilterFavoritedBy(query, r.Form)
 
 	err = query.Find(&articles).Error
 
-	if tags, ok := queryParams["tag"]; ok {
-		articles, err = h.DB.GetAllArticlesWithTag(tags[0])
-	}
-
-	if authorBy, ok := queryParams["author"]; ok {
-		articles, err = h.DB.GetAllArticlesAuthoredBy(authorBy[0])
-	}
-
-	if favoritedBy, ok := queryParams["favorited"]; ok {
-		articles, err = h.DB.GetAllArticlesFavoritedBy(favoritedBy[0])
-	}
-
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -198,15 +187,7 @@ func (h *Handler) getArticles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u = &models.User{}
-	if claim, _ := h.JWT.CheckRequest(r); claim != nil {
-		u, err = h.DB.FindUserByUsername(claim.Username)
-	}
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
+	var u = r.Context().Value(CurrentUser).(*models.User)
 
 	var articlesJSON ArticlesJSON
 	for i := range articles {
@@ -311,7 +292,6 @@ func (h *Handler) updateArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if valid, errs := a.IsValid(); !valid {
-		h.Logger.Println(errs)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		errorResponse := errorResponse{Errors: errs}
@@ -361,7 +341,7 @@ func (h *Handler) favoriteArticle(w http.ResponseWriter, r *http.Request) {
 	a := r.Context().Value(FetchedArticle).(*models.Article)
 	u := r.Context().Value(CurrentUser).(*models.User)
 
-	err := h.DB.FavoriteArticle(u.ID, a.ID)
+	err := h.DB.FavoriteArticle(u, a)
 
 	articleJSON := ArticleJSON{
 		Article: h.buildArticleJSON(a, u),
@@ -383,7 +363,7 @@ func (h *Handler) unFavoriteArticle(w http.ResponseWriter, r *http.Request) {
 	a := r.Context().Value(FetchedArticle).(*models.Article)
 	u := r.Context().Value(CurrentUser).(*models.User)
 
-	err := h.DB.UnfavoriteArticle(u.ID, a.ID)
+	err := h.DB.UnfavoriteArticle(u, a)
 
 	articleJSON := ArticleJSON{
 		Article: h.buildArticleJSON(a, u),

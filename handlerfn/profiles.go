@@ -37,9 +37,8 @@ func getProfile(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 	}
 
 	// Response
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(models.ProfileResponse{Profile: p})
 	return nil
 }
@@ -63,9 +62,8 @@ func followUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 	}
 
 	// Response
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(models.ProfileResponse{Profile: p})
 	return nil
 }
@@ -89,9 +87,8 @@ func unfollowUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *A
 	}
 
 	// Response
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(models.ProfileResponse{Profile: p})
 	return nil
 }

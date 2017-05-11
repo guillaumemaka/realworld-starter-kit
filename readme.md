@@ -17,6 +17,32 @@ There are other GO implementations utilising the different web frameworks availa
 + [Go net/http (https://github.com/JackyChiu/realworld-starter-kit)](https://github.com/JackyChiu/realworld-starter-kit)
 + [Go + GIN (https://github.com/chrislewispac/realworld-starter-kit)](https://github.com/chrislewispac/realworld-starter-kit)
 
+# Progress
+API route status
+- [x] Authentication (`POST /api/users/login`)
+- [x] Registration (`POST /api/users`)
+- [x] Get Current User (`GET /api/user`)
+- [x] Update User (`PUT /api/user`)
+- [x] Get Profile (`GET/api/profiles/:username`)
+- [x] Follow user (`POST /api/profiles/:username/follow`)
+- [x] Unfollow user (`DELETE /api/profiles/:username/follow`)
+- [x] List Articles (`GET /api/articles`)
+- [ ] Feed Articles (`GET /api/articles/feed`)
+- [x] Get Article (`GET /api/articles/:slug`)
+- [x] Create Article (`POST /api/articles`)
+- [x] Update Article (`PUT /api/articles/:slug`)
+- [x] Delete Article (`DELETE /api/articles/:slug`)
+- [ ] Add Comments to an Article (`POST /api/articles/:slug/comments`)
+- [ ] Get Comments from an Article (`GET /api/articles/:slug/comments`)
+- [ ] Delete Comment (`DELETE /api/articles/:slug/comments/:id`)
+- [ ] Favourite Article (`POST /api/articles/:slug/favorite`)
+- [ ] Unfavourite Article (`DELETE /api/articles/:slug/favorite`)
+- [ ] Get Tags (`GET /api/tags`)
+
+## Post API completion
+- [ ] TESTS !!!
+- [ ] Optimise / Refactor / Data model Refining
+- [ ] Docker?
 
 # How it works
 

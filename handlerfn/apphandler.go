@@ -55,9 +55,8 @@ func (ah AppHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if e.StatusCode != 0 {
 			c = e.StatusCode
 		}
-		w.WriteHeader(c)
 		w.Header().Set("Content-Type", "application/json")
-
+		w.WriteHeader(c)
 		json.NewEncoder(w).Encode(e)
 
 	}

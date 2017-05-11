@@ -68,9 +68,8 @@ func register(env *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppE
 	u.Token = token
 
 	// Response
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(models.UserResponse{User: u})
 	return nil
 }

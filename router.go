@@ -29,9 +29,9 @@ func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
 	// Unprotected Routes
 	api.Handle("/users", hfn.Register(&env)).Methods("POST").Name("Registration")
 	api.Handle("/users/login", hfn.Login(&env)).Methods("POST").Name("Authentication")
+	api.Handle("/articles/{slug}", hfn.GetArticle(&env)).Methods("GET").Name("Get Article")
 	// TODO
 	api.Handle("/tags", na).Methods("GET").Name("Get Tags")
-	api.Handle("/articles/{slug}", na).Methods("GET").Name("Get Article")
 
 	// OPTIONAL Auth - What does that mean how to implement?
 	// First thought is to write 2 sets of middleware
@@ -39,20 +39,20 @@ func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
 	//   MustHaveUser - will check the request context for the presence of a user and will redirect if not present
 	//
 	api.Handle("/profiles/{username}", hfn.GetProfile(&env)).Methods("GET").Name("Get Profile")
+	api.Handle("/articles", hfn.ListArticles(&env)).Methods("GET").Name("List Articles")
 	// TODO
 	api.Handle("/articles/{slug}/comments", na).Methods("GET").Name("Get Comments from an Article")
-	api.Handle("/articles", na).Methods("GET").Name("List Articles")
 
 	// Protected Routes
 	api.Handle("/user", hfn.MustHaveUser(hfn.GetCurrentUser(&env).(hfn.AppHandler))).Methods("GET").Name("Get Current User")
 	api.Handle("/user", hfn.MustHaveUser(hfn.UpdateUser(&env).(hfn.AppHandler))).Methods("PUT").Name("Update User")
-	// TODO
 	api.Handle("/profiles/{username}/follow", hfn.MustHaveUser(hfn.FollowUser(&env).(hfn.AppHandler))).Methods("POST").Name("Follow User")
 	api.Handle("/profiles/{username}/follow", hfn.MustHaveUser(hfn.UnfollowUser(&env).(hfn.AppHandler))).Methods("DELETE").Name("Unfollow User")
+	api.Handle("/articles", hfn.MustHaveUser(hfn.CreateArticle(&env).(hfn.AppHandler))).Methods("POST").Name("Create Article")
+	api.Handle("/articles/{slug}", hfn.MustHaveUser(hfn.DeleteArticle(&env).(hfn.AppHandler))).Methods("DELETE").Name("Delete Article")
+	api.Handle("/articles/{slug}", hfn.MustHaveUser(hfn.UpdateArticle(&env).(hfn.AppHandler))).Methods("PUT").Name("Update Article")
+	// TODO
 	api.Handle("/articles/feed", na).Methods("GET").Name("Feed Articles")
-	api.Handle("/articles", na).Methods("POST").Name("Create Article")
-	api.Handle("/articles/{slug}", na).Methods("PUT").Name("Update Article")
-	api.Handle("/articles/{slug}", na).Methods("DELETE").Name("Delete Article")
 	api.Handle("/articles/{slug}/favourite", na).Methods("POST").Name("Favourite Article")
 	api.Handle("/articles/{slug}/favourite", na).Methods("DELETE").Name("Unavourite Article")
 	api.Handle("/articles/{slug}/comments", na).Methods("POST").Name("Add Comments to an Article")

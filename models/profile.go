@@ -29,6 +29,13 @@ const (
 	qUnfollowUser = `DELETE FROM usr_following WHERE usr_id=? AND usr_following_id=?`
 )
 
+// ProfileFromUser is a shortcut for creating a profile struct from a User struct
+func ProfileFromUser(u User) Profile {
+	return Profile{
+		ID: u.ID, Username: u.Username, Bio: u.Bio, Image: u.Image, Following: false,
+	}
+}
+
 // GetProfileByUsername returns a profile for the supplied username
 func (adb *AppDB) GetProfileByUsername(username string, whosasking uint) (*Profile, error) {
 	var p Profile

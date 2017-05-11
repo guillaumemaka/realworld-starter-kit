@@ -48,8 +48,8 @@ func TestBuildQueryOptions(t *testing.T) {
 		{"MultipleTag", "GET", "/api/articles?tag=testing&tag=chilledoj&tag=johnjacob", 20, 0, []string{"testing", "chilledoj", "johnjacob"}, empSl, empSl},
 		{"SingleAuthor", "GET", "/api/articles?author=testing", 20, 0, empSl, []string{"testing"}, empSl},
 		{"MultipleAuthor", "GET", "/api/articles?author=testing&author=chilledoj&author=johnjacob", 20, 0, empSl, []string{"testing", "chilledoj", "johnjacob"}, empSl},
-		{"SingleFavorite", "GET", "/api/articles?favorite=testing", 20, 0, empSl, empSl, []string{"testing"}},
-		{"MultipleFavorite", "GET", "/api/articles?favorite=testing&favorite=chilledoj&favorite=johnjacob", 20, 0, empSl, empSl, []string{"testing", "chilledoj", "johnjacob"}},
+		{"SingleFavorite", "GET", "/api/articles?favorited=testing", 20, 0, empSl, empSl, []string{"testing"}},
+		{"MultipleFavorite", "GET", "/api/articles?favorited=testing&favorited=chilledoj&favorited=johnjacob", 20, 0, empSl, empSl, []string{"testing", "chilledoj", "johnjacob"}},
 	}
 
 	for _, test := range tests {

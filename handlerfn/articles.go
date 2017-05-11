@@ -226,7 +226,7 @@ func buildQueryOptions(r *http.Request) models.ListArticleOptions {
 	filters := make(map[string][]string)
 	filters["tag"] = qVals["tag"]
 	filters["author"] = qVals["author"]
-	filters["favorite"] = qVals["favorite"]
+	filters["favorite"] = qVals["favorited"]
 
 	parsedOptions["filters"] = filters
 	return models.NewListOptions(parsedOptions)

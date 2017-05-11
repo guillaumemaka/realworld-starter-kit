@@ -209,13 +209,14 @@ func (adb *AppDB) DeleteArticle(slug string) error {
 
 // ListArticles returns a list of articles
 // The list will be filtered by the passed in options
-func (adb *AppDB) ListArticles(opt ListArticleOptions, whosasking uint) ([]*Article, error) {
+// If feed is true, the list of articles will only contain those articles by authors
+// who the user (whosasking) is following
+func (adb *AppDB) ListArticles(opt ListArticleOptions, whosasking uint, feed bool) ([]*Article, error) {
 	articles := make([]*Article, 0)
-	sql, args, err := opt.BuildArticleQuery(1)
+	sql, args, err := opt.BuildArticleQuery(whosasking, feed)
 	if err != nil {
 		return nil, err
 	}
-
 	rows, err := adb.DB.Query(sql, args...)
 	if err != nil {
 		return nil, err
@@ -273,14 +274,20 @@ func NewListOptions(args map[string]interface{}) ListArticleOptions {
 }
 
 // BuildArticleQuery builds the list article SQL
-func (opts ListArticleOptions) BuildArticleQuery(whoisasking uint) (string, []interface{}, error) {
-	sql, args, err := sq.Select(`a.id,slug,title,description,body,created,updated,
+func (opts ListArticleOptions) BuildArticleQuery(whoisasking uint, feed bool) (string, []interface{}, error) {
+	qry := sq.Select(`a.id,slug,title,description,body,created,updated,
 	u.username as author_username, u.bio, u.image as author_image
 	,CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
 	, t.tags`).From("articles a").
 		Join("users u on a.author_id = u.id").
-		LeftJoin("(SELECT art_id,group_concat(tag SEPARATOR '||') as tags FROM art_tags GROUP BY art_id) t on a.id = t.art_id").
-		LeftJoin("usr_following uf ON u.id = uf.usr_following_id and uf.usr_id = ?", whoisasking).ToSql()
+		LeftJoin("(SELECT art_id,group_concat(tag SEPARATOR '||') as tags FROM art_tags GROUP BY art_id) t on a.id = t.art_id")
+	if feed {
+		qry = qry.Join("usr_following uf ON u.id = uf.usr_following_id and uf.usr_id = ?", whoisasking)
+	} else {
+		qry = qry.LeftJoin("usr_following uf ON u.id = uf.usr_following_id and uf.usr_id = ?", whoisasking)
+	}
+
+	sql, args, err := qry.ToSql()
 	if err != nil {
 		return "", nil, err
 	}

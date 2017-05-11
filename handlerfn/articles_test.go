@@ -2,12 +2,26 @@ package handlerfn
 
 import (
 	"encoding/json"
+	"flag"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/chilledoj/realworld-starter-kit/models"
 )
+
+var (
+	user1 models.User
+	user2 models.User
+)
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	user1 = models.User{ID: 1, Username: "user1"}
+	user2 = models.User{ID: 2, Username: "user2"}
+	os.Exit(m.Run())
+}
 
 func TestBuildQueryOptions(t *testing.T) {
 	buf := strings.NewReader("TEST")

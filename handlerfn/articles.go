@@ -3,7 +3,6 @@ package handlerfn
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -25,6 +24,11 @@ func GetArticle(ae *AppEnvironment) http.Handler {
 // ListArticles handler
 func ListArticles(ae *AppEnvironment) http.Handler {
 	return AppHandler{ae, listArticles}
+}
+
+// FeedArticles handler
+func FeedArticles(ae *AppEnvironment) http.Handler {
+	return AppHandler{ae, feedArticles}
 }
 
 // UpdateArticle handler
@@ -171,23 +175,33 @@ func getArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 
 // R - READ
 func listArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+	return respondListOfArticles(ae, w, r, false)
+}
+
+// R - READ
+func feedArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+	ae.Logger.Println("feedArticles Route")
+	return respondListOfArticles(ae, w, r, true)
+}
+
+func respondListOfArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request, feed bool) *AppError {
 	// Parse
 	opts := buildQueryOptions(r)
-
+	ae.Logger.Printf("Built Query Opts : %v\n", opts)
 	// GetUser
-	// This should return a nil pointer if the user is not authenticated
+	// This should return a nil pointer if the user is not authenticated (in list articles route)
 	u, err := getUserFromContext(r)
 	if err != nil {
 		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
 	}
-	var id uint
+	var id uint // id has zero value. Assume no user with ID=0 in DB
 	if u != nil {
 		id = u.ID
 	}
 
 	ae.Logger.Printf("Getting %d records offset by %d", opts.Limit, opts.Offset)
 	// Query
-	articles, err := ae.DB.ListArticles(opts, id)
+	articles, err := ae.DB.ListArticles(opts, id, feed)
 	if err != nil {
 		return &AppError{Err: []error{err}}
 	}
@@ -215,7 +229,6 @@ func buildQueryOptions(r *http.Request) models.ListArticleOptions {
 	filters["favorite"] = qVals["favorite"]
 
 	parsedOptions["filters"] = filters
-	log.Println(parsedOptions)
 	return models.NewListOptions(parsedOptions)
 }
 

@@ -27,7 +27,7 @@ API route status
 - [x] Follow user (`POST /api/profiles/:username/follow`)
 - [x] Unfollow user (`DELETE /api/profiles/:username/follow`)
 - [x] List Articles (`GET /api/articles`)
-- [ ] Feed Articles (`GET /api/articles/feed`)
+- [x] Feed Articles (`GET /api/articles/feed`)
 - [x] Get Article (`GET /api/articles/:slug`)
 - [x] Create Article (`POST /api/articles`)
 - [x] Update Article (`PUT /api/articles/:slug`)
@@ -40,6 +40,7 @@ API route status
 - [ ] Get Tags (`GET /api/tags`)
 
 ## Post API completion
+- [ ] Better error / response handling
 - [ ] TESTS !!!
 - [ ] Optimise / Refactor / Data model Refining
 - [ ] Docker?

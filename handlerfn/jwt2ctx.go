@@ -56,7 +56,7 @@ func getUserFromContext(r *http.Request) (*models.User, error) {
 	ctx := r.Context()
 	u, ok := ctx.Value(userKey).(*models.User)
 	// check if u==nil first because we don't care if ok is true/false if u is nil
-	if u != nil && !ok {
+	if u == nil || !ok {
 		return nil, fmt.Errorf("Can't get user from context")
 	}
 	return u, nil

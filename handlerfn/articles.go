@@ -3,6 +3,7 @@ package handlerfn
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -47,8 +48,40 @@ type articlePost struct {
 	Body        *string       `json:"body"`
 	Tags        *[]models.Tag `json:"tagList"`
 }
+
+const snil = "<nil>"
+
+func (ap articlePost) String() string {
+	var t, d, b, tg string
+	if ap.Title != nil {
+		t = *ap.Title
+	} else {
+		t = snil
+	}
+	if ap.Description != nil {
+		d = *ap.Description
+	} else {
+		d = snil
+	}
+	if ap.Body != nil {
+		b = *ap.Body
+	} else {
+		b = snil
+	}
+	if ap.Tags != nil {
+		tg = fmt.Sprintf("%v", *ap.Tags)
+	} else {
+		tg = "<nil>"
+	}
+	return fmt.Sprintf("{Title: %v, Description: %v, Body:%s, Tags: %s}", t, d, b, tg)
+}
+
 type articleFormPost struct {
 	Article articlePost `json:"article"`
+}
+
+func (afp articleFormPost) String() string {
+	return fmt.Sprintf("{Article: %s}", afp.Article)
 }
 
 // UnmarshalJSON implements json decoding
@@ -96,14 +129,16 @@ func createArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 	artPost := articleFormPost{}
 	err := json.NewDecoder(r.Body).Decode(&artPost)
 	if err != nil {
-		return &AppError{Err: []error{err}}
+		ae.Logger.Printf("JSON ERR: %+v", err)
+		return &AppError{Err: []error{fmt.Errorf("Invalid JSON provided")}}
 	}
 	defer r.Body.Close()
-
+	ae.Logger.Printf("Validating %s", artPost.String())
 	// Validate
 	if errs := artPost.Validate(); len(errs) > 0 {
 		return &AppError{Err: errs}
 	}
+
 	// Get user from request and convert to Profile
 	u, err := getUserFromContext(r)
 	if err != nil {
@@ -218,7 +253,7 @@ func buildQueryOptions(r *http.Request) models.ListArticleOptions {
 	qVals := r.URL.Query()
 	parsedOptions := make(map[string]interface{})
 	if v, err := strconv.ParseUint(qVals.Get("limit"), 10, 32); err == nil && v > 0 {
-		parsedOptions["limit"] = uint(v)
+		parsedOptions["limit"] = uint(math.Min(float64(v), 100))
 	}
 	if v, err := strconv.ParseUint(qVals.Get("offset"), 10, 32); err == nil && v > 0 {
 		parsedOptions["offset"] = uint(v)

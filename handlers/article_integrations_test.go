@@ -197,7 +197,7 @@ func TestArticlesHandler_Create(t *testing.T) {
 
 	jsonBody, _ := json.Marshal(a)
 	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %s", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusCreated {
@@ -249,7 +249,7 @@ func TestArticlesHandler_CreateWithEmptyTitle(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %s", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusUnprocessableEntity {
@@ -281,7 +281,7 @@ func TestArticlesHandler_CreateWithEmptyDescription(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %s", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusUnprocessableEntity {
@@ -313,7 +313,7 @@ func TestArticlesHandler_CreateWithEmptyBody(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %s", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusUnprocessableEntity {
@@ -342,7 +342,7 @@ func TestArticlesHandler_UpdateForbidden(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	recorder := makeRequest(t, "PUT", "/api/articles/"+a.Slug, bytes.NewBuffer(jsonBody), http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %s", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusForbidden {
@@ -379,7 +379,7 @@ func TestArticlesHandler_UpdateOK(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(a.User.Username)
 
 	recorder := makeRequest(t, "PUT", "/api/articles/"+a.Slug, bytes.NewBuffer(jsonBody), http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %s", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusOK {
@@ -409,7 +409,7 @@ func TestArticlesHandler_Favorite(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	var recorder = makeRequest(t, "POST", "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %v", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
 	var articleResponse ArticleJSON
@@ -438,7 +438,7 @@ func TestArticlesHandler_FavoriteAlreadyFavoritedArticle(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	var recorder = makeRequest(t, "POST", "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %v", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
 	var articleResponse ArticleJSON
@@ -460,7 +460,7 @@ func TestArticlesHandler_Unfavorite(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	var recorder = makeRequest(t, "DELETE", "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %v", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
 	var articleResponse ArticleJSON
@@ -487,7 +487,7 @@ func TestArticlesHandler_UnfavoriteNotYetFavoritedArticle(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	var recorder = makeRequest(t, "DELETE", "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %v", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
 	var articleResponse ArticleJSON
@@ -521,7 +521,7 @@ func TestArticlesHandler_DeleteOk(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	recorder := makeRequest(t, "DELETE", "/api/articles/"+a.Slug, nil, http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %v", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusNoContent {
@@ -545,7 +545,7 @@ func TestArticlesHandler_DeleteForbidden(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(unauthorizedUser.Username)
 
 	recorder := makeRequest(t, "DELETE", "/api/articles/"+a.Slug, nil, http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %v", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusForbidden {
@@ -567,7 +567,7 @@ func TestArticlesHandler_ValidTokenButUserNotExist(t *testing.T) {
 	jwt := auth.NewJWT().NewToken("non-existing-username")
 
 	recorder := makeRequest(t, "GET", "/api/articles", nil, http.Header{
-		"Authorization": []string{fmt.Sprintf("Bearer %v", jwt)},
+		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
 	if Code := recorder.Code; Code != http.StatusUnauthorized {

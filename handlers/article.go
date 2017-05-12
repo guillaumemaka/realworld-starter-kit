@@ -163,7 +163,7 @@ func (h *Handler) getArticles(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var articles = []models.Article{}
 
-	query := h.DB.GetAllArticles().Debug()
+	query := h.DB.GetAllArticles()
 
 	r.ParseForm()
 

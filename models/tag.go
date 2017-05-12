@@ -22,6 +22,6 @@ func (db *DB) FindTags(tags *[]Tag) error {
 }
 
 func (db *DB) FindTagOrInit(tagName string) (tag Tag, err error) {
-	err = db.DB.FirstOrInit(&tag, Tag{Name: tagName}).Error
+	err = db.FirstOrInit(&tag, Tag{Name: tagName}).Error
 	return
 }

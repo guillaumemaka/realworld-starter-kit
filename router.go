@@ -41,6 +41,8 @@ func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
 	api.Handle("/articles", hfn.ListArticles(&env)).Methods("GET").Name("List Articles")
 	api.Handle("/articles", hfn.MustHaveUser(hfn.CreateArticle(&env).(hfn.AppHandler))).Methods("POST").Name("Create Article")
 	api.Handle("/articles/feed", hfn.MustHaveUser(hfn.FeedArticles(&env).(hfn.AppHandler))).Methods("GET").Name("Feed Articles")
+	api.Handle("/articles/{slug}/favourite", hfn.MustHaveUser(hfn.FavouriteArticle(&env).(hfn.AppHandler))).Methods("POST").Name("Favourite Article")
+	api.Handle("/articles/{slug}/favourite", hfn.MustHaveUser(hfn.UnfavouriteArticle(&env).(hfn.AppHandler))).Methods("DELETE").Name("Unavourite Article")
 	api.Handle("/articles/{slug}", hfn.GetArticle(&env)).Methods("GET").Name("Get Article")
 	api.Handle("/articles/{slug}", hfn.MustHaveUser(hfn.UpdateArticle(&env).(hfn.AppHandler))).Methods("PUT").Name("Update Article")
 	api.Handle("/articles/{slug}", hfn.MustHaveUser(hfn.DeleteArticle(&env).(hfn.AppHandler))).Methods("DELETE").Name("Delete Article")
@@ -54,8 +56,6 @@ func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
 	// Protected Routes
 	api.Handle("/articles/{slug}/comments", na).Methods("POST").Name("Add Comments to an Article")
 	api.Handle("/articles/{slug}/comments/{id}", na).Methods("DELETE").Name("Delete Comment")
-	api.Handle("/articles/{slug}/favourite", na).Methods("POST").Name("Favourite Article")
-	api.Handle("/articles/{slug}/favourite", na).Methods("DELETE").Name("Unavourite Article")
 
 	jwtRouter := hfn.Jwt2Ctx{Env: &env, Fn: r}
 	return handlers.RecoveryHandler()(handlers.CombinedLoggingHandler(os.Stdout, jwtRouter))

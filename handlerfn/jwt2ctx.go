@@ -10,6 +10,11 @@ import (
 	"github.com/chilledoj/realworld-starter-kit/models"
 )
 
+var (
+	JwtNoUser  = fmt.Errorf("No user in context")
+	JwtNoToken = fmt.Errorf("No token in context")
+)
+
 // Jwt2Ctx is effectively a middleware struct in http.Handler form that puts
 // the user stored in JWT claims into the request context (GO >=1.7)
 type Jwt2Ctx struct {
@@ -57,7 +62,7 @@ func getUserFromContext(r *http.Request) (*models.User, error) {
 	u, ok := ctx.Value(userKey).(*models.User)
 	// check if u==nil first because we don't care if ok is true/false if u is nil
 	if u == nil || !ok {
-		return nil, fmt.Errorf("Can't get user from context")
+		return nil, JwtNoUser
 	}
 	return u, nil
 }
@@ -66,8 +71,8 @@ func getTokenFromContext(r *http.Request) (string, error) {
 	ctx := r.Context()
 	token, ok := ctx.Value(tokenKey).(string)
 	// check if token=="" first because we don't care if ok is true/false if token is ""
-	if token != "" && !ok {
-		return "", fmt.Errorf("Can't get token from context")
+	if token == "" || !ok {
+		return "", JwtNoToken
 	}
 	return token, nil
 }

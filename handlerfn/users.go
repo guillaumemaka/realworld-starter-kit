@@ -18,11 +18,11 @@ func getUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppErr
 	// Get Data
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return notAuthenticated
 	}
 	token, err := getTokenFromContext(r)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return notAuthenticated
 	}
 	u.Token = token
 
@@ -61,7 +61,7 @@ func updateUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 	// Get Current User
 	reqU, err := getUserFromContext(r)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return notAuthenticated
 	}
 	u, err := ae.DB.UserByID(reqU.ID)
 	if err != nil {
@@ -97,7 +97,7 @@ func updateUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 	// Get Token for response
 	token, err := getTokenFromContext(r)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{fmt.Errorf("Problem getting user details")}}
+		return notAuthenticated
 	}
 
 	u.Token = token

@@ -71,7 +71,7 @@ func (ap articlePost) String() string {
 	if ap.Tags != nil {
 		tg = fmt.Sprintf("%v", *ap.Tags)
 	} else {
-		tg = "<nil>"
+		tg = snil
 	}
 	return fmt.Sprintf("{Title: %v, Description: %v, Body:%s, Tags: %s}", t, d, b, tg)
 }
@@ -92,7 +92,7 @@ func (ap *articlePost) UnmarshalJSON(data []byte) error {
 		Tags *[]string `json:"tagList"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return nil
+		return err
 	}
 	ap.Body = aux.Body
 	ap.Title = aux.Title
@@ -109,15 +109,15 @@ func (ap *articlePost) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (ap articleFormPost) Validate() []error {
+func (afp articleFormPost) Validate() []error {
 	var errs []error
-	if ap.Article.Title == nil || *ap.Article.Title == "" {
+	if afp.Article.Title == nil || *afp.Article.Title == "" {
 		errs = append(errs, fmt.Errorf("Title is not set"))
 	}
-	if ap.Article.Description == nil || *ap.Article.Description == "" {
+	if afp.Article.Description == nil || *afp.Article.Description == "" {
 		errs = append(errs, fmt.Errorf("Description is not set"))
 	}
-	if ap.Article.Body == nil || *ap.Article.Body == "" {
+	if afp.Article.Body == nil || *afp.Article.Body == "" {
 		errs = append(errs, fmt.Errorf("Body is not set"))
 	}
 	return errs
@@ -142,10 +142,7 @@ func createArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 	// Get user from request and convert to Profile
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
-	}
-	if u == nil { // Really need to get a user
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{fmt.Errorf("Could not retrieve User")}}
+		return notAuthenticated
 	}
 	p := models.ProfileFromUser(*u)
 
@@ -187,10 +184,7 @@ func getArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 
 	// GetUser
 	// This should return a nil pointer if the user is not authenticated
-	u, err := getUserFromContext(r)
-	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
-	}
+	u, _ := getUserFromContext(r)
 	var id uint
 	if u != nil {
 		id = u.ID
@@ -225,10 +219,7 @@ func respondListOfArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Re
 	ae.Logger.Printf("Built Query Opts : %v\n", opts)
 	// GetUser
 	// This should return a nil pointer if the user is not authenticated (in list articles route)
-	u, err := getUserFromContext(r)
-	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
-	}
+	u, _ := getUserFromContext(r)
 	var id uint // id has zero value. Assume no user with ID=0 in DB
 	if u != nil {
 		id = u.ID
@@ -284,7 +275,7 @@ func updateArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 	// This should return a nil pointer if the user is not authenticated
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return notAuthenticated
 	}
 	// Get Article
 	a, err := ae.DB.GetArticle(slug, u.ID)
@@ -342,7 +333,7 @@ func deleteArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 	// GetUser
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return notAuthenticated
 	}
 	// Get Article
 	a, err := ae.DB.GetArticle(slug, u.ID)

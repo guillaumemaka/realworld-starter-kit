@@ -2,7 +2,6 @@ package handlerfn
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/chilledoj/realworld-starter-kit/models"
@@ -20,10 +19,8 @@ func getProfile(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 	username := vars["username"]
 
 	// This should return a nil pointer if the user is not authenticated
-	u, err := getUserFromContext(r)
-	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
-	}
+	// and we can ignore the error here.
+	u, _ := getUserFromContext(r)
 	var id uint
 	if u != nil {
 		id = u.ID
@@ -100,10 +97,7 @@ func getUserAndProfile(ae *AppEnvironment, r *http.Request) (*models.User, *mode
 
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return nil, nil, &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
-	}
-	if u == nil {
-		return nil, nil, &AppError{StatusCode: http.StatusForbidden, Err: []error{fmt.Errorf("Not authenticated")}}
+		return nil, nil, notAuthenticated
 	}
 
 	// Get Profile

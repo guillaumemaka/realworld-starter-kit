@@ -17,16 +17,16 @@ type ProfileResponse struct {
 }
 
 const (
-	qGetProfileByUsername = `SELECT 
-	id,username, bio,image, 
-	CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following 
+	qGetProfileByUsername = `SELECT
+	id,username, bio,image,
+	CASE WHEN uf.user_following_id IS null THEN 0 ELSE 1 END AS following
 	FROM users u
-	LEFT OUTER JOIN usr_following uf 
-		ON u.id = uf.usr_following_id
-		and uf.usr_id = ?
+	LEFT OUTER JOIN usr_following uf
+		ON u.id = uf.user_following_id
+		and uf.user_id = ?
 	WHERE u.username = ?`
-	qFollowUser   = `INSERT INTO usr_following (usr_id, usr_following_id) VALUES (?,?)`
-	qUnfollowUser = `DELETE FROM usr_following WHERE usr_id=? AND usr_following_id=?`
+	qFollowUser   = `INSERT INTO usr_following (user_id, user_following_id) VALUES (?,?)`
+	qUnfollowUser = `DELETE FROM usr_following WHERE user_id=? AND user_following_id=?`
 )
 
 // ProfileFromUser is a shortcut for creating a profile struct from a User struct

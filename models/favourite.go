@@ -3,8 +3,8 @@ package models
 import "fmt"
 
 const (
-	qFavArticle   = `INSERT INTO usr_art_favourite (usr_id, art_id) VALUES (?,?)`
-	qUnfavArticle = `DELETE FROM usr_art_favourite WHERE usr_id=? AND art_id=?`
+	qFavArticle   = `INSERT INTO usr_art_favourite (user_id, article_id) VALUES (?,?)`
+	qUnfavArticle = `DELETE FROM usr_art_favourite WHERE user_id=? AND article_id=?`
 )
 
 // FavouriteArticle allows a user to favourite an article

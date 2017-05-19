@@ -43,25 +43,25 @@ const (
 	qGetCommentsForArticle = `SELECT
   c.id, c.body, c.createdAt, c.updatedAt,
   u.id, u.username, u.bio, u.image
-  , CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
+  , CASE WHEN uf.user_following_id IS null THEN 0 ELSE 1 END AS following
   FROM comments c
   JOIN users u on c.author_id = u.id
   JOIN articles a on c.article_id = a.id
   LEFT OUTER JOIN usr_following uf
-  		ON u.id = uf.usr_following_id
-  		and uf.usr_id = ?
+  		ON u.id = uf.user_following_id
+  		and uf.user_id = ?
   WHERE a.slug = ?
   `
 	qGetCommentsByID = `SELECT
   c.id, c.body, c.createdAt, c.updatedAt,
   u.id, u.username, u.bio, u.image
-  , CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
+  , CASE WHEN uf.user_following_id IS null THEN 0 ELSE 1 END AS following
   FROM comments c
   JOIN users u on c.author_id = u.id
   JOIN articles a on c.article_id = a.id
   LEFT OUTER JOIN usr_following uf
-  		ON u.id = uf.usr_following_id
-  		and uf.usr_id = ?
+  		ON u.id = uf.user_following_id
+  		and uf.user_id = ?
   WHERE a.slug = ? AND c.id = ?
   `
 	qAddComment = `insert into comments(body,createdAt,updatedAt,author_id,article_id)

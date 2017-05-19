@@ -17,10 +17,10 @@ type TagJSONResponse struct {
 }
 
 const (
-	qCreateTag      = "INSERT INTO art_tags (tag,art_id) VALUES (?,?)"
+	qCreateTag      = "INSERT INTO art_tags (tag,article_id) VALUES (?,?)"
 	qReadTags       = "SELECT DISTINCT tag from art_tags"
-	qGetArticleTags = "SELECT tag FROM art_tags WHERE art_id=?"
-	qDeleteTags     = "DELETE FROM art_tags WHERE art_id = ?"
+	qGetArticleTags = "SELECT tag FROM art_tags WHERE article_id=?"
+	qDeleteTags     = "DELETE FROM art_tags WHERE article_id = ?"
 )
 
 // AddTags persists a slice of tags to the DB for a given article

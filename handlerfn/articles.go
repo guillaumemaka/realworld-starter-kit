@@ -218,7 +218,7 @@ func feedArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) er
 func respondListOfArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request, feed bool) error {
 	// Parse
 	opts := buildQueryOptions(r)
-	ae.Logger.Printf("Built Query Opts : %v\n", opts)
+	ae.Logger.Printf("Built Query Opts :\n%s\n%v\n", r.URL, opts)
 	// GetUser
 	// This should return a nil pointer if the user is not authenticated (in list articles route)
 	u, _ := getUserFromContext(r)
@@ -346,7 +346,7 @@ func deleteArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) e
 	if err != nil {
 		return errors.Wrap(err, "deleteArticle:: DB.GetArticle()")
 	}
-	if u.Username != a.Author.Username {
+	if u.ID != a.Author.ID {
 		return forbidden{}
 	}
 

@@ -58,22 +58,22 @@ const (
 	qCreateArticle = "INSERT INTO articles (slug,title,description,body,created,updated,author_id) VALUES (?,?,?,?,?,?,?)"
 	// READSQL
 	qArticleDetailsPart = `SELECT a.id,slug,title,description,body,created,updated,
-	u.username as author_username, u.bio, u.image as author_image
-	,CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
+	u.id, u.username as author_username, u.bio, u.image as author_image
+	,CASE WHEN uf.user_following_id IS null THEN 0 ELSE 1 END AS following
 	, coalesce(fav.num_fav,0) as num_fav, coalesce(fav.usr_Fav,0) as usr_fav
-	, t.tags
+	, coalesce(t.tags,'') as tags
 	FROM articles a
 	JOIN users u on a.author_id = u.id
-	LEFT OUTER JOIN (select art_id, count(*) as num_fav, sum(case when usr_id=? then 1 else 0 end) as usr_fav from usr_art_favourite group by art_id) fav ON a.id = fav.art_id
-	LEFT OUTER JOIN (SELECT art_id,group_concat(tag SEPARATOR '||') as tags FROM art_tags GROUP BY art_id) t on a.id = t.art_id
+	LEFT OUTER JOIN (select article_id, count(*) as num_fav, sum(case when user_id=? then 1 else 0 end) as usr_fav from usr_art_favourite group by article_id) fav ON a.id = fav.article_id
+	LEFT OUTER JOIN (SELECT article_id,group_concat(tag SEPARATOR '||') as tags FROM art_tags GROUP BY article_id) t on a.id = t.article_id
 	`
 	qGetArticle = qArticleDetailsPart + `LEFT OUTER JOIN usr_following uf
-		ON u.id = uf.usr_following_id
-		and uf.usr_id = ?
+		ON u.id = uf.user_following_id
+		and uf.user_id = ?
 	WHERE a.slug = ?`
 	qGetFeedArticles = qArticleDetailsPart + `JOIN usr_following uf
-		ON u.id = uf.usr_following_id
-		and uf.usr_id = ?
+		ON u.id = uf.user_following_id
+		and uf.user_id = ?
 	`
 	// UPDATESQL
 	qUpdateArticle = `UPDATE articles SET slug=?, title=?, description=?,body=?,updated=? WHERE id=?`
@@ -154,7 +154,7 @@ func (adb *AppDB) GetArticle(slug string, whosasking uint) (*Article, error) {
 	*/
 	var tags string
 	if err := adb.DB.QueryRow(qGetArticle, whosasking, whosasking, slug).Scan(&a.ID, &a.Slug, &a.Title, &a.Description,
-		&a.Body, &a.CreatedAt, &a.UpdatedAt, &p.Username, &p.Bio, &p.Image, &p.Following, &a.FavouritesCount, &a.Favourited, &tags); err != nil {
+		&a.Body, &a.CreatedAt, &a.UpdatedAt, &p.ID, &p.Username, &p.Bio, &p.Image, &p.Following, &a.FavouritesCount, &a.Favourited, &tags); err != nil {
 		return nil, err
 	}
 
@@ -231,11 +231,13 @@ func (adb *AppDB) ListArticles(opt ListArticleOptions, whosasking uint, feed boo
 		p := Profile{}
 		var tags string
 		if err := rows.Scan(&a.ID, &a.Slug, &a.Title, &a.Description,
-			&a.Body, &a.CreatedAt, &a.UpdatedAt, &p.Username, &p.Bio, &p.Image, &p.Following, &a.FavouritesCount, &a.Favourited, &tags); err != nil {
+			&a.Body, &a.CreatedAt, &a.UpdatedAt, &p.ID, &p.Username, &p.Bio, &p.Image, &p.Following, &a.FavouritesCount, &a.Favourited, &tags); err != nil {
 			return nil, err
 		}
 		a.Author = &p
-		a.TagList = splitTagString(tags)
+		if len(tags) > 0 {
+			a.TagList = splitTagString(tags)
+		}
 		articles = append(articles, a)
 	}
 	return articles, nil
@@ -266,11 +268,25 @@ func NewListOptions(args map[string]interface{}) ListArticleOptions {
 	if len(args) == 0 {
 		return opts
 	}
-	if v, ok := args["limit"].(uint); ok && v > 0 {
-		opts.Limit = uint(v)
+	switch lim := args["limit"].(type) {
+	case uint:
+		if lim > 0 {
+			opts.Limit = lim
+		}
+	case int:
+		if lim > 0 {
+			opts.Limit = uint(lim)
+		}
 	}
-	if v, ok := args["offset"].(uint); ok && v > 0 {
-		opts.Offset = uint(v)
+	switch off := args["offset"].(type) {
+	case uint:
+		if off > 0 {
+			opts.Offset = off
+		}
+	case int:
+		if off > 0 {
+			opts.Offset = uint(off)
+		}
 	}
 	if v, ok := args["filters"].(map[string][]string); ok {
 		opts.Filters = v
@@ -283,17 +299,17 @@ func (opts ListArticleOptions) BuildArticleQuery(whoisasking uint, feed bool) (s
 	/*favs, args, err := sq.Select("art_id, count(*) as num_fav, sum(case when usr_id=? then 1 else 0 end) as usr_fav").
 	From("usr_art_favourite").GroupBy(art_id)*/
 	qry := sq.Select(`a.id,slug,title,description,body,created,updated,
-	u.username as author_username, u.bio, u.image as author_image
-	,CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
+	u.id, u.username as author_username, u.bio, u.image as author_image
+	,CASE WHEN uf.user_following_id IS null THEN 0 ELSE 1 END AS following
 	, coalesce(fav.num_fav,0) as num_fav, coalesce(fav.usr_Fav,0) as usr_fav
-	, t.tags`).From("articles a").
+	, coalesce(t.tags,'') as tags`).From("articles a").
 		Join("users u on a.author_id = u.id").
-		LeftJoin("(select art_id, count(*) as num_fav, sum(case when usr_id=? then 1 else 0 end) as usr_fav from usr_art_favourite group by art_id) fav ON a.id = fav.art_id").
-		LeftJoin("(SELECT art_id,group_concat(tag SEPARATOR '||') as tags FROM art_tags GROUP BY art_id) t on a.id = t.art_id")
+		LeftJoin("(select article_id, count(*) as num_fav, sum(case when user_id=? then 1 else 0 end) as usr_fav from usr_art_favourite group by article_id) fav ON a.id = fav.article_id").
+		LeftJoin("(SELECT article_id,group_concat(tag SEPARATOR '||') as tags FROM art_tags GROUP BY article_id) t on a.id = t.article_id")
 	if feed {
-		qry = qry.Join("usr_following uf ON u.id = uf.usr_following_id and uf.usr_id = ?", whoisasking)
+		qry = qry.Join("usr_following uf ON u.id = uf.user_following_id and uf.user_id = ?", whoisasking)
 	} else {
-		qry = qry.LeftJoin("usr_following uf ON u.id = uf.usr_following_id and uf.usr_id = ?", whoisasking)
+		qry = qry.LeftJoin("usr_following uf ON u.id = uf.user_following_id and uf.user_id = ?", whoisasking)
 	}
 
 	sql, args, err := qry.ToSql()
@@ -321,8 +337,8 @@ func (opts ListArticleOptions) BuildArticleQuery(whoisasking uint, feed bool) (s
 			where += authors
 			args = append(args, vals...)
 		case "favorite":
-			favs, vals, err := sq.Select("art_id").From("usr_art_favourite fav").
-				Join("users u on fav.usr_id = u.id").
+			favs, vals, err := sq.Select("article_id").From("usr_art_favourite fav").
+				Join("users u on fav.user_id = u.id").
 				Where(sq.Eq{"u.username": filterValues}).ToSql()
 			if err != nil {
 				log.Println(err)
@@ -330,7 +346,7 @@ func (opts ListArticleOptions) BuildArticleQuery(whoisasking uint, feed bool) (s
 			where += fmt.Sprintf("a.id in (%s)", favs)
 			args = append(args, vals...)
 		case "tag":
-			tagsql, vals, err := sq.Select("art_id").From("art_tags").Where(sq.Eq{"tag": filterValues}).ToSql()
+			tagsql, vals, err := sq.Select("article_id").From("art_tags").Where(sq.Eq{"tag": filterValues}).ToSql()
 			if err != nil {
 				return "", nil, err
 			}

@@ -6,7 +6,6 @@ import (
 )
 
 func TestNewListOptions(t *testing.T) {
-	t.SkipNow()
 	// somesetup of test cases
 	empty := map[string]interface{}{}
 	singleTag := map[string][]string{"tag": []string{"AngularJS"}}
@@ -18,23 +17,23 @@ func TestNewListOptions(t *testing.T) {
 		args map[string]interface{}
 		want ListArticleOptions
 	}{
-		{"Defaults",
+		{"NewListOptions:Defaults",
 			empty,
 			ListArticleOptions{Limit: 20, Offset: 0, Filters: map[string][]string{}},
 		},
-		{"AllParamsPassedIn",
+		{"NewListOptions:AllParamsPassedIn",
 			map[string]interface{}{"limit": 30, "offset": 10, "filters": singleTag},
 			ListArticleOptions{Limit: 30, Offset: 10, Filters: singleTag},
 		},
-		{"MultipleTagFilter",
+		{"NewListOptions:MultipleTagFilter",
 			map[string]interface{}{"filters": multiTag},
 			ListArticleOptions{Limit: 20, Offset: 0, Filters: multiTag},
 		},
-		{"OneOfEachFilter",
+		{"NewListOptions:OneOfEachFilter",
 			map[string]interface{}{"filters": oneOfEach},
 			ListArticleOptions{Limit: 20, Offset: 0, Filters: oneOfEach},
 		},
-		{"VerySpecificFilter",
+		{"NewListOptions:VerySpecificFilter",
 			map[string]interface{}{"filters": vSpecific},
 			ListArticleOptions{Limit: 20, Offset: 0, Filters: vSpecific},
 		},

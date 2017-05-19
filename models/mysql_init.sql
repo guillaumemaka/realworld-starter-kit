@@ -17,17 +17,17 @@ CREATE TABLE IF NOT EXISTS `users` (
   `bio` text NOT NULL,
   `image` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `email` (`email`),
-  UNIQUE KEY `username` (`username`)
+  UNIQUE KEY `USER_email` (`email`),
+  UNIQUE KEY `USER_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `usr_following` (
-  `usr_id` int(11) unsigned NOT NULL,
-  `usr_following_id` int(11) unsigned NOT NULL,
-  PRIMARY KEY (`usr_id`,`usr_following_id`),
-  KEY `following_id` (`usr_following_id`),
-  CONSTRAINT `FOLLOWuserID` FOREIGN KEY (`usr_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `FOLLOWusrFollowID` FOREIGN KEY (`usr_following_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  `user_id` int(11) unsigned NOT NULL,
+  `user_following_id` int(11) unsigned NOT NULL,
+  PRIMARY KEY (`user_id`,`user_following_id`),
+  KEY `following_id` (`user_following_id`),
+  CONSTRAINT `FOLLOW_userID` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `FOLLOW_usrFollowID` FOREIGN KEY (`user_following_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
@@ -42,17 +42,17 @@ CREATE TABLE IF NOT EXISTS `articles` (
   `author_id` int(11) unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `slug` (`slug`),
-  KEY `ARTICLEusrID` (`author_id`),
-  CONSTRAINT `ARTICLEusrID` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`)
+  KEY `ARTICLE_userID` (`author_id`),
+  CONSTRAINT `ARTICLE_user` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `art_tags` (
   `tag` varchar(255) NOT NULL DEFAULT '',
-  `art_id` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`tag`,`art_id`),
-  KEY `tags` (`tag`),
-  KEY `tag_article_id` (`art_id`),
-  CONSTRAINT `tag_article_id` FOREIGN KEY (`art_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  `article_id` int(10) unsigned NOT NULL,
+  PRIMARY KEY (`tag`,`article_id`),
+  KEY `TAGs` (`tag`),
+  KEY `TAG_article_id` (`article_id`),
+  CONSTRAINT `TAG_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `comments` (
@@ -63,19 +63,19 @@ CREATE TABLE IF NOT EXISTS `comments` (
   `author_id` int(11) unsigned NOT NULL,
   `article_id` int(11) unsigned NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `comment_author` (`author_id`),
-  KEY `comment_article` (`article_id`),
-  CONSTRAINT `comment_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `comment_author` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  KEY `COMMENT_author_ID` (`author_id`),
+  KEY `COMMENT_article` (`article_id`),
+  CONSTRAINT `COMMENT_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `COMMENT_author` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `usr_art_favourite` (
-  `usr_id` int(11) unsigned NOT NULL,
-  `art_id` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`usr_id`,`art_id`),
-  KEY `FAVOURITEartID` (`art_id`),
-  CONSTRAINT `FAVOURITEartID` FOREIGN KEY (`art_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `FAVOURITEusrID` FOREIGN KEY (`usr_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  `user_id` int(11) unsigned NOT NULL,
+  `article_id` int(10) unsigned NOT NULL,
+  PRIMARY KEY (`user_id`,`article_id`),
+  KEY `FAVOURITE_artID` (`article_id`),
+  CONSTRAINT `FAVOURITE_article` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `FAVOURITE_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 

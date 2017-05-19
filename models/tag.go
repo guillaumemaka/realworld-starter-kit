@@ -31,7 +31,7 @@ const (
 // At a later date it might be best to look into JSON column type
 // or even just a simple TEXT column with a delimiter and FULLTEXT Search
 func (adb *AppDB) AddTags(a *Article, tags []Tag) (ts []Tag, err error) {
-	ts = make([]Tag, 0)
+	//ts = make([]Tag, 0)
 	tx, err := adb.DB.Begin()
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func (adb *AppDB) AddTags(a *Article, tags []Tag) (ts []Tag, err error) {
 		err = tx.Commit()
 	}()
 
-	if _, err := tx.Exec(qDeleteTags, a.ID); err != nil {
+	if _, err = tx.Exec(qDeleteTags, a.ID); err != nil {
 		return nil, err
 	}
 	stmt, err := tx.Prepare(qCreateTag)

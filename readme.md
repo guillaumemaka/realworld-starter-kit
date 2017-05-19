@@ -32,16 +32,18 @@ API route status
 - [x] Create Article (`POST /api/articles`)
 - [x] Update Article (`PUT /api/articles/:slug`)
 - [x] Delete Article (`DELETE /api/articles/:slug`)
-- [ ] Add Comments to an Article (`POST /api/articles/:slug/comments`)
-- [ ] Get Comments from an Article (`GET /api/articles/:slug/comments`)
-- [ ] Delete Comment (`DELETE /api/articles/:slug/comments/:id`)
+- [x] Add Comments to an Article (`POST /api/articles/:slug/comments`)
+- [x] Get Comments from an Article (`GET /api/articles/:slug/comments`)
+- [x] Delete Comment (`DELETE /api/articles/:slug/comments/:id`)
 - [x] Favourite Article (`POST /api/articles/:slug/favorite`)
 - [x] Unfavourite Article (`DELETE /api/articles/:slug/favorite`)
 - [x] Get Tags (`GET /api/tags`)
 
 ## Post API completion
-- [ ] Better error / response handling
 - [ ] TESTS !!!
+- [ ] Make simpler - maybe another branch to show simpler use of ``func (w http.ResponseWriter, r *http.Request) ``?
+- [ ] Better/simpler error / response handling - just ``w.WriteHeader`` on error
+- [ ] alice/negroni chaining?
 - [ ] Optimise / Refactor / Data model Refining
 - [ ] Docker?
 

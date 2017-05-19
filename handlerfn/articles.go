@@ -198,7 +198,6 @@ func getArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		return errors.Wrap(err, "getArticle:: DB.GetArticle() failure")
 	}
-	ae.Logger.Println(a.Favourited)
 	// Response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -213,7 +212,6 @@ func listArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) er
 
 // R - READ
 func feedArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
-	ae.Logger.Println("feedArticles Route")
 	return respondListOfArticles(ae, w, r, true)
 }
 
@@ -284,6 +282,10 @@ func updateArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) e
 	a, err := ae.DB.GetArticle(slug, u.ID)
 	if err != nil {
 		return errors.Wrap(err, "updateArticle:: DB.GetArticle()")
+	}
+
+	if u.ID != a.Author.ID {
+		return forbidden{}
 	}
 	// Update attributes
 	changed := false

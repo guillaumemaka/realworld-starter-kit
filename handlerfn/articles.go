@@ -10,6 +10,7 @@ import (
 
 	"github.com/chilledoj/realworld-starter-kit/models"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 // CreateArticle handler
@@ -92,7 +93,7 @@ func (ap *articlePost) UnmarshalJSON(data []byte) error {
 		Tags *[]string `json:"tagList"`
 	}{}
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
+		return errors.Wrap(err, "articlePost::Unmarshal()")
 	}
 	ap.Body = aux.Body
 	ap.Title = aux.Title
@@ -109,52 +110,55 @@ func (ap *articlePost) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (afp articleFormPost) Validate() []error {
-	var errs []error
+func (afp articleFormPost) Validate() error {
+	validations := invalidInputError{}
 	if afp.Article.Title == nil || *afp.Article.Title == "" {
-		errs = append(errs, fmt.Errorf("Title is not set"))
+		validations.Errs["title"] = []string{"Title is not set"}
 	}
 	if afp.Article.Description == nil || *afp.Article.Description == "" {
-		errs = append(errs, fmt.Errorf("Description is not set"))
+		validations.Errs["description"] = []string{"Description is not set"}
 	}
 	if afp.Article.Body == nil || *afp.Article.Body == "" {
-		errs = append(errs, fmt.Errorf("Body is not set"))
+		validations.Errs["body"] = []string{"Body is not set"}
 	}
-	return errs
+	if len(validations.Errs) > 0 {
+		return validations
+	}
+	return nil
 }
 
 // C - CREATE
-func createArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func createArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	// Parse
 	artPost := articleFormPost{}
 	err := json.NewDecoder(r.Body).Decode(&artPost)
 	if err != nil {
-		ae.Logger.Printf("JSON ERR: %+v", err)
-		return &AppError{Err: []error{fmt.Errorf("Invalid JSON provided")}}
+		//ae.Logger.Printf("JSON ERR: %+v", err)
+		return errors.Wrap(err, "createArticle:: articleFormPost decode()")
 	}
 	defer r.Body.Close()
 	ae.Logger.Printf("Validating %s", artPost.String())
 	// Validate
-	if errs := artPost.Validate(); len(errs) > 0 {
-		return &AppError{Err: errs}
+	if errs := artPost.Validate(); errs != nil {
+		return errs
 	}
 
 	// Get user from request and convert to Profile
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return notAuthenticated
+		return err
 	}
 	p := models.ProfileFromUser(*u)
 
 	// Create
 	a, err := models.NewArticle(*artPost.Article.Title, *artPost.Article.Description, *artPost.Article.Body, &p)
 	if err != nil {
-		return &AppError{Err: []error{err}}
+		return errors.Wrap(err, "createArticle: DB.NewArticle() failure")
 	}
 
 	// Persist to DB
 	if err := ae.DB.CreateArticle(a); err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return errors.Wrap(err, "createArticle: DB.CreateArticle() failure")
 	}
 
 	// Tags
@@ -177,7 +181,7 @@ func createArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 }
 
 // R - READ
-func getArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func getArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	// Parse
 	vars := mux.Vars(r)
 	slug := vars["slug"]
@@ -192,9 +196,9 @@ func getArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 	// Get Article
 	a, err := ae.DB.GetArticle(slug, id)
 	if err != nil {
-		return &AppError{Err: []error{err}}
+		return errors.Wrap(err, "getArticle:: DB.GetArticle() failure")
 	}
-
+	ae.Logger.Println(a.Favourited)
 	// Response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -203,17 +207,17 @@ func getArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 }
 
 // R - READ
-func listArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func listArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	return respondListOfArticles(ae, w, r, false)
 }
 
 // R - READ
-func feedArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func feedArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	ae.Logger.Println("feedArticles Route")
 	return respondListOfArticles(ae, w, r, true)
 }
 
-func respondListOfArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request, feed bool) *AppError {
+func respondListOfArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Request, feed bool) error {
 	// Parse
 	opts := buildQueryOptions(r)
 	ae.Logger.Printf("Built Query Opts : %v\n", opts)
@@ -229,7 +233,7 @@ func respondListOfArticles(ae *AppEnvironment, w http.ResponseWriter, r *http.Re
 	// Query
 	articles, err := ae.DB.ListArticles(opts, id, feed)
 	if err != nil {
-		return &AppError{Err: []error{err}}
+		return errors.Wrap(err, "respondListOfArticles:: DB.ListArticles failure")
 	}
 	ae.Logger.Printf("Got %d records", len(articles))
 
@@ -259,7 +263,7 @@ func buildQueryOptions(r *http.Request) models.ListArticleOptions {
 }
 
 // U - UPDATE
-func updateArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func updateArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	// Parse
 	vars := mux.Vars(r)
 	slug := vars["slug"]
@@ -267,20 +271,19 @@ func updateArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 	artPost := articleFormPost{}
 	err := json.NewDecoder(r.Body).Decode(&artPost)
 	if err != nil {
-		return &AppError{Err: []error{err}}
+		return invalidInputError{}
 	}
 	defer r.Body.Close()
 
 	// GetUser
-	// This should return a nil pointer if the user is not authenticated
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return notAuthenticated
+		return err
 	}
 	// Get Article
 	a, err := ae.DB.GetArticle(slug, u.ID)
 	if err != nil {
-		return &AppError{Err: []error{err}}
+		return errors.Wrap(err, "updateArticle:: DB.GetArticle()")
 	}
 	// Update attributes
 	changed := false
@@ -303,19 +306,20 @@ func updateArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 	}
 
 	if !changed {
-		return &AppError{Err: []error{fmt.Errorf("No relevant fields sent")}}
+		return invalidInputError{}
 	}
 	a.UpdatedAt = time.Now().UTC()
 
 	// Update
 	if err := ae.DB.UpdateArticle(a); err != nil {
-		return &AppError{Err: []error{err}}
+		return errors.Wrap(err, "updateArticle:: DB.UpdateArticle()")
 	}
 	if artPost.Article.Tags != nil {
 		tags, err := ae.DB.AddTags(a, a.TagList)
 		if err != nil {
-			return &AppError{Err: []error{fmt.Errorf("Error adding tags\n%s\n%s", tags, err)}}
+			return errors.Wrap(err, "updateArticle:: DB.AddTags()")
 		}
+		a.TagList = tags
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -325,7 +329,7 @@ func updateArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 }
 
 // D - DELETE
-func deleteArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func deleteArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	// Parse
 	vars := mux.Vars(r)
 	slug := vars["slug"]
@@ -333,20 +337,20 @@ func deleteArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *
 	// GetUser
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return notAuthenticated
+		return err
 	}
 	// Get Article
 	a, err := ae.DB.GetArticle(slug, u.ID)
 	if err != nil {
-		return &AppError{Err: []error{err}}
+		return errors.Wrap(err, "deleteArticle:: DB.GetArticle()")
 	}
 	if u.Username != a.Author.Username {
-		return &AppError{StatusCode: http.StatusForbidden, Err: []error{fmt.Errorf("You may only delete articles you are the author of")}}
+		return forbidden{}
 	}
 
 	// Delete
 	if err := ae.DB.DeleteArticle(a.Slug); err != nil {
-		return &AppError{Err: []error{err}}
+		return errors.Wrap(err, "deleteArticle:: DB.DeleteArticle()")
 	}
 	// Response
 	w.Header().Set("Content-Type", "application/json")

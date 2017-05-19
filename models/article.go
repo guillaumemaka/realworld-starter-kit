@@ -60,9 +60,11 @@ const (
 	qArticleDetailsPart = `SELECT a.id,slug,title,description,body,created,updated,
 	u.username as author_username, u.bio, u.image as author_image
 	,CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
+	, coalesce(fav.num_fav,0) as num_fav, coalesce(fav.usr_Fav,0) as usr_fav
 	, t.tags
 	FROM articles a
 	JOIN users u on a.author_id = u.id
+	LEFT OUTER JOIN (select art_id, count(*) as num_fav, sum(case when usr_id=? then 1 else 0 end) as usr_fav from usr_art_favourite group by art_id) fav ON a.id = fav.art_id
 	LEFT OUTER JOIN (SELECT art_id,group_concat(tag SEPARATOR '||') as tags FROM art_tags GROUP BY art_id) t on a.id = t.art_id
 	`
 	qGetArticle = qArticleDetailsPart + `LEFT OUTER JOIN usr_following uf
@@ -147,13 +149,15 @@ func (adb *AppDB) GetArticle(slug string, whosasking uint) (*Article, error) {
 		a.id,slug,title,description,body,created,updated,
 		u.username as author_username, u.bio, u.image as author_image
 		,CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
-		,t.tag
+		, fav.num_fav, fav.usr_Fav
+		, t.tags
 	*/
 	var tags string
-	if err := adb.DB.QueryRow(qGetArticle, whosasking, slug).Scan(&a.ID, &a.Slug, &a.Title, &a.Description,
-		&a.Body, &a.CreatedAt, &a.UpdatedAt, &p.Username, &p.Bio, &p.Image, &p.Following, &tags); err != nil {
+	if err := adb.DB.QueryRow(qGetArticle, whosasking, whosasking, slug).Scan(&a.ID, &a.Slug, &a.Title, &a.Description,
+		&a.Body, &a.CreatedAt, &a.UpdatedAt, &p.Username, &p.Bio, &p.Image, &p.Following, &a.FavouritesCount, &a.Favourited, &tags); err != nil {
 		return nil, err
 	}
+
 	a.Author = &p
 	a.TagList = splitTagString(tags)
 	return a, nil
@@ -227,7 +231,7 @@ func (adb *AppDB) ListArticles(opt ListArticleOptions, whosasking uint, feed boo
 		p := Profile{}
 		var tags string
 		if err := rows.Scan(&a.ID, &a.Slug, &a.Title, &a.Description,
-			&a.Body, &a.CreatedAt, &a.UpdatedAt, &p.Username, &p.Bio, &p.Image, &p.Following, &tags); err != nil {
+			&a.Body, &a.CreatedAt, &a.UpdatedAt, &p.Username, &p.Bio, &p.Image, &p.Following, &a.FavouritesCount, &a.Favourited, &tags); err != nil {
 			return nil, err
 		}
 		a.Author = &p
@@ -279,8 +283,10 @@ func (opts ListArticleOptions) BuildArticleQuery(whoisasking uint, feed bool) (s
 	qry := sq.Select(`a.id,slug,title,description,body,created,updated,
 	u.username as author_username, u.bio, u.image as author_image
 	,CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
+	, coalesce(fav.num_fav,0) as num_fav, coalesce(fav.usr_Fav,0) as usr_fav
 	, t.tags`).From("articles a").
 		Join("users u on a.author_id = u.id").
+		LeftJoin("(select art_id, count(*) as num_fav, sum(case when usr_id=? then 1 else 0 end) as usr_fav from usr_art_favourite group by art_id) fav", whoisasking).
 		LeftJoin("(SELECT art_id,group_concat(tag SEPARATOR '||') as tags FROM art_tags GROUP BY art_id) t on a.id = t.art_id")
 	if feed {
 		qry = qry.Join("usr_following uf ON u.id = uf.usr_following_id and uf.usr_id = ?", whoisasking)

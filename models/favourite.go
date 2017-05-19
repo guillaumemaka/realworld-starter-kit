@@ -13,7 +13,7 @@ func (adb *AppDB) FavouriteArticle(a *Article, u *User) error {
 	if err != nil {
 		return err
 	}
-	res, err := stmt.Exec(a.ID, u.ID)
+	res, err := stmt.Exec(u.ID, a.ID)
 	if err != nil {
 		return err
 	}
@@ -24,6 +24,8 @@ func (adb *AppDB) FavouriteArticle(a *Article, u *User) error {
 	if rows != 1 {
 		return fmt.Errorf("Did not insert row for %s to favourite %s", u.Username, a.Slug)
 	}
+	a.Favourited = true
+	a.FavouritesCount++
 	return nil
 }
 
@@ -33,7 +35,7 @@ func (adb *AppDB) UnfavouriteArticle(a *Article, u *User) error {
 	if err != nil {
 		return err
 	}
-	res, err := stmt.Exec(a.ID, u.ID)
+	res, err := stmt.Exec(u.ID, a.ID)
 	if err != nil {
 		return err
 	}
@@ -44,5 +46,7 @@ func (adb *AppDB) UnfavouriteArticle(a *Article, u *User) error {
 	if rows != 1 {
 		return fmt.Errorf("Did not delete row for %s to follow %s", u.Username, a.Slug)
 	}
+	a.FavouritesCount--
+	a.Favourited = a.FavouritesCount > 0
 	return nil
 }

@@ -86,7 +86,9 @@ func Test_getUserFromContext(t *testing.T) {
 
 			r = r.WithContext(ctx)
 			u, err := getUserFromContext(r)
-
+			if err != nil {
+				t.Error(err)
+			}
 			if u.ID != user.ID || u.Username != user.Username {
 				t.Errorf("getUserFromContext() did not store user correctly %v, want %v", claims.User, user)
 			}

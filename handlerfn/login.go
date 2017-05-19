@@ -2,17 +2,21 @@ package handlerfn
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/mail"
 	"strings"
 
 	"github.com/chilledoj/realworld-starter-kit/models"
+	"github.com/pkg/errors"
 )
 
 // Login returns JWT on successful validation of provided credentials
 func Login(ae *AppEnvironment) http.Handler {
 	return AppHandler{ae, login}
+}
+
+var invalidLogin = invalidInputError{
+	Errs: map[string][]string{"email or password": []string{"is invalid"}},
 }
 
 type loginUser struct {
@@ -24,48 +28,51 @@ type loginJSONPost struct {
 }
 
 func (login *loginJSONPost) Validate() error {
-	_, err := mail.ParseAddress(login.User.Email)
-	if err != nil {
-		return err
+
+	if login.User.Email == "" || login.User.Password == "" {
+		return invalidLogin
+	}
+	if _, err := mail.ParseAddress(login.User.Email); err != nil {
+		return invalidLogin
 	}
 	login.User.Email = strings.ToLower(login.User.Email)
 
 	if len(login.User.Password) < models.PasswordLengthRequirement {
-		return fmt.Errorf("Password should be at least %d characters long", models.PasswordLengthRequirement)
+		return invalidLogin
 	}
 	return nil
 }
 
-func login(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func login(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	// Parse
 	loginUsr := loginJSONPost{}
 	err := json.NewDecoder(r.Body).Decode(&loginUsr)
 	if err != nil {
-		return &AppError{Err: []error{err}}
+		return errors.Wrap(err, "login:: jsonDecode")
 	}
 	defer r.Body.Close()
 
 	// Validate Post
 	if err = loginUsr.Validate(); err != nil {
-		return &AppError{Err: []error{err}}
+		return err
 	}
 
 	// Check Credentials
 	u, err := ae.DB.UserByEmail(loginUsr.User.Email)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusBadRequest, Err: []error{err}}
+		return errors.Wrap(err, "login:: DB.UserByEmail()")
 	}
 	if u == nil {
-		return &AppError{StatusCode: http.StatusBadRequest, Err: []error{err}}
+		return errors.Wrap(err, "login:: DB.UserByEmail() u==nil")
 	}
 	if err = u.ValidatePassword(loginUsr.User.Password); err != nil {
-		return &AppError{StatusCode: http.StatusBadRequest, Err: []error{err}}
+		return invalidLogin
 	}
 
 	// JWT Token / Login
 	token, err := models.NewToken(u)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return errors.Wrap(err, "login:: models.NewToken()")
 	}
 	u.Token = token
 

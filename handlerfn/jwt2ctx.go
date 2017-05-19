@@ -3,16 +3,11 @@ package handlerfn
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/chilledoj/realworld-starter-kit/models"
-)
-
-var (
-	JwtNoUser  = fmt.Errorf("No user in context")
-	JwtNoToken = fmt.Errorf("No token in context")
+	"github.com/pkg/errors"
 )
 
 // Jwt2Ctx is effectively a middleware struct in http.Handler form that puts
@@ -31,7 +26,9 @@ func (m Jwt2Ctx) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			m.Env.Logger.Printf("JWT Validation err: %+v", err)
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(AppError{Err: []error{fmt.Errorf("Invalid JWT token provided")}})
+			json.NewEncoder(w).Encode(struct {
+				Errors string `json:"error"`
+			}{Errors: "Invalid Token"})
 		}
 		r = r.WithContext(ctx)
 	}
@@ -62,7 +59,7 @@ func getUserFromContext(r *http.Request) (*models.User, error) {
 	u, ok := ctx.Value(userKey).(*models.User)
 	// check if u==nil first because we don't care if ok is true/false if u is nil
 	if u == nil || !ok {
-		return nil, JwtNoUser
+		return nil, errors.New("No User in context")
 	}
 	return u, nil
 }
@@ -72,7 +69,7 @@ func getTokenFromContext(r *http.Request) (string, error) {
 	token, ok := ctx.Value(tokenKey).(string)
 	// check if token=="" first because we don't care if ok is true/false if token is ""
 	if token == "" || !ok {
-		return "", JwtNoToken
+		return "", errors.New("No Token in context")
 	}
 	return token, nil
 }

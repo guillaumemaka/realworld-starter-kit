@@ -35,9 +35,10 @@ const (
 	qCreateUser = "INSERT INTO users (username,email,password,bio,image) VALUES (?,?,?,?,?)"
 	//qCreateUser = "INSERT INTO users (username,email,password,bio,image) VALUES ($1,$2,$3,$4,$5)"
 	//qCreateUser = "INSERT INTO users (username,email,password,bio,image) VALUES (:username,:email,:password,:bio,:image)"
-	qUserByID    = "SELECT id,username,email,password,bio,image from users WHERE id=?"
-	qUserByEmail = "SELECT id,username,email,password,bio,image from users WHERE email=?"
-	qUpdateUser  = "UPDATE users SET username=?,email=?,password=?,bio=?,image=? WHERE id=?"
+	qUserByID      = "SELECT id,username,email,password,bio,image FROM users WHERE id=?"
+	qUserByEmail   = "SELECT id,username,email,password,bio,image FROM users WHERE email=?"
+	qCountUsername = "SELECT count(*) as num FROM users WHERE username=?"
+	qUpdateUser    = "UPDATE users SET username=?,email=?,password=?,bio=?,image=? WHERE id=?"
 )
 
 // CreateUser provides the C of CRU* for USERS
@@ -87,6 +88,15 @@ func (adb *AppDB) UserByEmail(email string) (*User, error) {
 		return &u, err
 	}
 	return &u, nil
+}
+
+// CountUsername does exactly what it does on the tin
+func (adb *AppDB) CountUsername(username string) (int, error) {
+	var num int
+	if err := adb.DB.QueryRow(qCountUsername, username).Scan(&num); err != nil {
+		return -1, err
+	}
+	return num, nil
 }
 
 // SetPassword ensures that a hash of the password is stored on the user instead of the plaintext version

@@ -6,6 +6,7 @@ import (
 
 	"github.com/chilledoj/realworld-starter-kit/models"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 )
 
 // GetProfile is the handler for the Get Profile route
@@ -13,7 +14,7 @@ func GetProfile(ae *AppEnvironment) http.Handler {
 	return AppHandler{ae, getProfile}
 }
 
-func getProfile(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func getProfile(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	// Parse
 	vars := mux.Vars(r)
 	username := vars["username"]
@@ -30,7 +31,7 @@ func getProfile(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 	// JOIN and so if a value of zero is passed in, then FOLLOWING would just be false.
 	p, err := ae.DB.GetProfileByUsername(username, id)
 	if err != nil {
-		return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return errors.Wrap(err, "getProfile:: DB.GetProfileByUsername()")
 	}
 
 	// Response
@@ -45,7 +46,7 @@ func FollowUser(ae *AppEnvironment) http.Handler {
 	return AppHandler{ae, followUser}
 }
 
-func followUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func followUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	u, p, err := getUserAndProfile(ae, r)
 	if err != nil {
 		return err
@@ -53,7 +54,7 @@ func followUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *App
 	if !p.Following {
 		// Follow
 		if err := ae.DB.FollowUser(u.ID, p.ID); err != nil {
-			return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+			return errors.Wrap(err, "followUser:: DB.FollowUser()")
 		}
 		p.Following = true
 	}
@@ -70,7 +71,7 @@ func UnfollowUser(ae *AppEnvironment) http.Handler {
 	return AppHandler{ae, unfollowUser}
 }
 
-func unfollowUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *AppError {
+func unfollowUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 	u, p, err := getUserAndProfile(ae, r)
 	if err != nil {
 		return err
@@ -78,7 +79,7 @@ func unfollowUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *A
 	if p.Following {
 		// Unfollow
 		if err := ae.DB.UnfollowUser(u.ID, p.ID); err != nil {
-			return &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+			return errors.Wrap(err, "unfollowUser:: DB.UnfollowUser()")
 		}
 		p.Following = false
 	}
@@ -90,20 +91,20 @@ func unfollowUser(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) *A
 	return nil
 }
 
-func getUserAndProfile(ae *AppEnvironment, r *http.Request) (*models.User, *models.Profile, *AppError) {
+func getUserAndProfile(ae *AppEnvironment, r *http.Request) (*models.User, *models.Profile, error) {
 	// Parse
 	vars := mux.Vars(r)
 	username := vars["username"]
 
 	u, err := getUserFromContext(r)
 	if err != nil {
-		return nil, nil, notAuthenticated
+		return nil, nil, errors.Wrap(err, "getUserAndProfile:: getUserFromContext()")
 	}
 
 	// Get Profile
 	p, err := ae.DB.GetProfileByUsername(username, u.ID)
 	if err != nil {
-		return nil, nil, &AppError{StatusCode: http.StatusInternalServerError, Err: []error{err}}
+		return nil, nil, errors.Wrap(err, "getUserAndProfile:: DB.GetProfileByUsername()")
 	}
 	return u, p, nil
 }

@@ -46,6 +46,7 @@ API route status
 - [ ] alice/negroni chaining?
 - [ ] Optimise / Refactor / Data model Refining
 - [ ] Docker?
+- [ ] Vendor dependencies
 
 # How it works
 

@@ -1,7 +1,6 @@
 package handlerfn
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 
@@ -27,19 +26,14 @@ func (ah AppHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if e := ah.fn(ah.env, w, r); e != nil {
 		ah.env.Logger.Printf("ERROR:: %s: %v", r.URL, e)
-		c := http.StatusUnprocessableEntity
+		c := http.StatusInternalServerError
 		if err, ok := e.(statusCoder); ok {
 			c = err.StatusCode()
 		}
-		if err, ok := e.(validationError); ok {
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(c)
-			json.NewEncoder(w).Encode(err)
-			return
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(c)
-
+		if err, ok := e.(dataError); ok {
+			w.Write(err.Data())
+		}
 	}
 }

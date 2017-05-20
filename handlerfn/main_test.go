@@ -24,7 +24,6 @@ const (
 var (
 	user1      models.User
 	user1Token string
-	jsonTests  map[string]string
 )
 
 func TestMain(m *testing.M) {
@@ -33,20 +32,12 @@ func TestMain(m *testing.M) {
 
 	// DATA
 	user1 = models.User{ID: 1, Username: "user1", Email: "test1@test.com"}
-	/*user1Token, err := models.NewToken(&user1)
+	var err error
+	user1Token, err = models.NewToken(&user1)
 	if err != nil {
 		panic(err)
-	}*/
+	}
 	//user2 = models.User{ID: 2, Username: "user2", Email: "test1@test.com"}
-
-	jsonTests = make(map[string]string, 7)
-	jsonTests["Empty"] = ""
-	jsonTests["Valid"] = `{"article": {"title":"title","description":"desc","body":"body"}}`
-	jsonTests["Valid_Tags"] = `{"article": {"title":"title","description":"desc","body":"body", "tagList":["testing","dragons"]}}`
-	jsonTests["MissingTitle"] = `{"article": {"description":"desc","body":"body"}}`
-	jsonTests["MissingDesc"] = `{"article": {"title":"title","body":"body"}}`
-	jsonTests["MissingBody"] = `{"article": {"title":"title","description":"description"}}`
-	jsonTests["EmptyArticle"] = `{"article":{}}`
 
 	// RUN
 	rc := m.Run()
@@ -104,7 +95,7 @@ func handlerTest(t *testing.T, fn func(*AppEnvironment) http.Handler, tests []fn
 
 			resp := w.Result()
 			resbody, _ := ioutil.ReadAll(resp.Body)
-			if resp.StatusCode != v.expStatus || (v.expErr && resp.StatusCode <= 400) {
+			if resp.StatusCode != v.expStatus || (v.expErr && resp.StatusCode < 400) {
 				t2.Errorf("Unexpected status code: Got (%d), want (%d)", resp.StatusCode, v.expStatus)
 			}
 			if resp.Header.Get("Content-Type") != v.expContentType {

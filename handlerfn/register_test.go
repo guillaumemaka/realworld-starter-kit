@@ -2,7 +2,9 @@ package handlerfn
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	sqlmock "gopkg.in/DATA-DOG/go-sqlmock.v1"
@@ -12,10 +14,10 @@ const registerURL = "/api/register"
 
 func TestRegister(t *testing.T) {
 	tests := []fnTest{
-		{"Register:NoBody", http.MethodPost, registerURL, "", nil, http.StatusUnprocessableEntity, true, jsn,
+		{"Register:NoBody", http.MethodPost, registerURL, "", nil, http.StatusBadRequest, true, jsn,
 			func(mock sqlmock.Sqlmock) {},
 			func(reqBody, resBody string) bool {
-				return len(resBody) == 0
+				return strings.Contains(resBody, `"error": "Bad Request"`)
 			}},
 		{"Register:EmptyJSON", http.MethodPost, registerURL, "{}", nil, http.StatusUnprocessableEntity, true, jsn,
 			func(mock sqlmock.Sqlmock) {},
@@ -117,6 +119,15 @@ func TestRegister(t *testing.T) {
 			},
 			func(reqBody, resBody string) bool {
 				return true
+			}},
+		{"Register:DB_Fail", http.MethodPost, registerURL, `{"user":{"email":"email@test.com","username":"b","password":"password"}}`, nil, http.StatusInternalServerError, true, jsn,
+			func(mock sqlmock.Sqlmock) {
+				rows := sqlmock.NewRows([]string{"num"}).AddRow(0)
+				mock.ExpectQuery("SELECT count(.)+ FROM users WHERE username=?").WithArgs("b").WillReturnRows(rows)
+				mock.ExpectPrepare("INSERT INTO users (.)+").ExpectExec().WillReturnError(fmt.Errorf("Insert fail"))
+			},
+			func(reqBody, resBody string) bool {
+				return len(resBody) == 0
 			}},
 	}
 	//handler := Register(ae)

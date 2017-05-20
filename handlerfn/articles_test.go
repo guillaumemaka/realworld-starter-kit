@@ -2,27 +2,33 @@ package handlerfn
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/chilledoj/realworld-starter-kit/models"
 	sqlmock "gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
 func TestCreateArticle(t *testing.T) {
-	t.SkipNow()
+	jsonTests := make(map[string]string, 7)
+	jsonTests["Empty"] = ""
+	jsonTests["Valid"] = `{"article": {"title":"title","description":"desc","body":"body"}}`
+	jsonTests["Valid_Tags"] = `{"article": {"title":"title","description":"desc","body":"body", "tagList":["testing","dragons"]}}`
+	jsonTests["MissingTitle"] = `{"article": {"description":"desc","body":"body"}}`
+	jsonTests["MissingDesc"] = `{"article": {"title":"title","body":"body"}}`
+	jsonTests["MissingBody"] = `{"article": {"title":"title","description":"description"}}`
+	jsonTests["EmptyArticle"] = `{"article":{}}`
+	path := "/api/articles"
 	tests := []fnTest{
-		{"Valid", "POST", "/", jsonTests["Valid"], &user1, http.StatusOK, false, jsn,
+		{"CreateArticle:Valid", "POST", path, jsonTests["Valid"], &user1, http.StatusOK, false, jsn,
 			func(mock sqlmock.Sqlmock) {
 				mock.ExpectPrepare("INSERT INTO articles").ExpectExec().WillReturnResult(sqlmock.NewResult(1, 1))
 			}, func(reqBody, resBody string) bool {
 				return !strings.Contains(resBody, "article") || !strings.Contains(resBody, `"id":1`)
 			}},
-		{"Valid_Tags", "POST", "/", jsonTests["Valid_Tags"], &user1, http.StatusOK, false, jsn,
+		{"CreateArticle:Valid_Tags", "POST", path, jsonTests["Valid_Tags"], &user1, http.StatusOK, false, jsn,
 			func(mock sqlmock.Sqlmock) {
 				mock.ExpectPrepare("INSERT INTO articles").ExpectExec().WillReturnResult(sqlmock.NewResult(1, 1))
 				mock.ExpectBegin()
@@ -33,33 +39,32 @@ func TestCreateArticle(t *testing.T) {
 			}, func(reqBody, resBody string) bool {
 				return strings.Contains(resBody, "article") || strings.Contains(resBody, `"id":1`)
 			}},
-		{"MissingTitle", "POST", "/", jsonTests["MissingTitle"], &user1, http.StatusUnprocessableEntity, true, jsn,
+		{"CreateArticle:MissingTitle", "POST", path, jsonTests["MissingTitle"], &user1, http.StatusUnprocessableEntity, true, jsn,
 			func(mock sqlmock.Sqlmock) {
 			}, func(reqBody, resBody string) bool {
 				return strings.Contains(resBody, "Title is not set")
 			}},
-		{"MissingDesc", "POST", "/", jsonTests["MissingDesc"], &user1, http.StatusUnprocessableEntity, true, jsn,
+		{"CreateArticle:MissingDesc", "POST", path, jsonTests["MissingDesc"], &user1, http.StatusUnprocessableEntity, true, jsn,
 			func(mock sqlmock.Sqlmock) {
 			}, func(reqBody, resBody string) bool {
 				return strings.Contains(resBody, "Description is not set")
 			}},
-		{"MissingBody", "POST", "/", jsonTests["MissingBody"], &user1, http.StatusUnprocessableEntity, true, jsn,
+		{"CreateArticle:MissingBody", "POST", path, jsonTests["MissingBody"], &user1, http.StatusUnprocessableEntity, true, jsn,
 			func(mock sqlmock.Sqlmock) {
 			}, func(reqBody, resBody string) bool {
 				return strings.Contains(resBody, "Body is not set")
 			}},
-		{"EmptyArticle", "POST", "/", jsonTests["EmptyArticle"], &user1, http.StatusUnprocessableEntity, true, jsn,
+		{"CreateArticle:EmptyArticle", "POST", path, jsonTests["EmptyArticle"], &user1, http.StatusUnprocessableEntity, true, jsn,
 			func(mock sqlmock.Sqlmock) {
 			}, func(reqBody, resBody string) bool {
 				return strings.Contains(resBody, "Title is not set") && strings.Contains(resBody, "Description is not set") && strings.Contains(resBody, "Body is not set")
 			}},
-		{"InvalidJSON", "POST", "/", `This is not valid JSON`, &user1, http.StatusUnprocessableEntity, true, jsn,
+		{"CreateArticle:InvalidJSON", "POST", path, `This is not valid JSON`, &user1, http.StatusBadRequest, true, jsn,
 			func(mock sqlmock.Sqlmock) {
 			}, func(reqBody, resBody string) bool {
-				return strings.Contains(resBody, "Invalid JSON provided")
+				return strings.Contains(resBody, `"error": "Bad Request"`)
 			}},
 	}
-	//handler := CreateArticle(ae)
 	handlerTest(t, CreateArticle, tests)
 }
 
@@ -72,31 +77,6 @@ func TestDeleteArticle(t *testing.T) {
 		,CASE WHEN uf.usr_following_id IS null THEN 0 ELSE 1 END AS following
 		,t.tag
 	*/
-	tests := []fnTest{
-		{"Valid", "POST", "/articles/test", jsonTests["Empty"], &user1, http.StatusOK, false, jsn,
-			func(mock sqlmock.Sqlmock) {
-				rows := sqlmock.NewRows([]string{"id", "slug", "title", "description", "body", "created", "updated",
-					"author_username", "bio", "author_image", "following", "tag"})
-				rows = rows.AddRow(1, "test", "title", "desc", "body", time.Now(), time.Now(),
-					user1.Username, "", "", 0, "dragons||test")
-				mock.ExpectQuery("SELECT (.)+ FROM articles (.)+").WithArgs(user1.ID, "").WillReturnRows(rows)
-				mock.ExpectPrepare("DELETE (.)").ExpectExec().WillReturnResult(sqlmock.NewResult(0, 1))
-			}, func(reqBody, resBody string) bool {
-				return resBody == "{}"
-			}},
-		{"NotFound", "POST", "/articles/test", jsonTests["Empty"], &user1, http.StatusUnprocessableEntity, true, jsn,
-			func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT (.)+ FROM articles (.)+").WithArgs(user1.ID, "").WillReturnError(fmt.Errorf("Not found"))
-			}, func(reqBody, resBody string) bool {
-				return strings.Contains(resBody, "Not found")
-			}},
-		{"NoUser", "POST", "/articles/test", jsonTests["Empty"], nil, http.StatusInternalServerError, true, jsn,
-			func(mock sqlmock.Sqlmock) {
-			}, func(reqBody, resBody string) bool {
-				return true // strings.Contains(resBody, "Not found")
-			}}}
-	//handler := DeleteArticle(ae)
-	handlerTest(t, DeleteArticle, tests)
 }
 
 func Test_buildQueryOptions(t *testing.T) {

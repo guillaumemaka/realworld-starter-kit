@@ -54,7 +54,7 @@ func register(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error 
 	regUsr := registerFormPost{}
 	err := json.NewDecoder(r.Body).Decode(&regUsr)
 	if err != nil {
-		return errors.Wrap(err, "register:: jsonDecode")
+		return badRequest{err: errors.Wrap(err, "register:: jsonDecode")}
 	}
 	defer r.Body.Close()
 	// Validate

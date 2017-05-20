@@ -111,7 +111,7 @@ func (ap *articlePost) UnmarshalJSON(data []byte) error {
 }
 
 func (afp articleFormPost) Validate() error {
-	validations := invalidInputError{}
+	validations := invalidInputError{Errs: make(map[string][]string)}
 	if afp.Article.Title == nil || *afp.Article.Title == "" {
 		validations.Errs["title"] = []string{"Title is not set"}
 	}
@@ -134,7 +134,7 @@ func createArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) e
 	err := json.NewDecoder(r.Body).Decode(&artPost)
 	if err != nil {
 		//ae.Logger.Printf("JSON ERR: %+v", err)
-		return errors.Wrap(err, "createArticle:: articleFormPost decode()")
+		return badRequest{err: errors.Wrap(err, "createArticle:: articleFormPost decode()")}
 	}
 	defer r.Body.Close()
 	ae.Logger.Printf("Validating %s", artPost.String())
@@ -142,6 +142,7 @@ func createArticle(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) e
 	if errs := artPost.Validate(); errs != nil {
 		return errs
 	}
+	ae.Logger.Printf("Passed validation")
 
 	// Get user from request and convert to Profile
 	u, err := getUserFromContext(r)

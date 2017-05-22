@@ -3,7 +3,7 @@
 > ### Go + Gorilla codebase containing real world examples (CRUD, auth, advanced patterns, etc) that adheres to the [RealWorld](https://github.com/gothinkster/realworld-example-apps) spec and API.
 
 
-### [Demo]()&nbsp;&nbsp;&nbsp;&nbsp;[RealWorld](https://github.com/gothinkster/realworld)
+### [RealWorld](https://github.com/gothinkster/realworld)
 
 
 This codebase was created to demonstrate a fully fledged fullstack application built with **Go + Gorilla** including CRUD operations, authentication, routing, pagination, and more.
@@ -39,10 +39,10 @@ API route status
 - [x] Unfavourite Article (`DELETE /api/articles/:slug/favorite`)
 - [x] Get Tags (`GET /api/tags`)
 
-## Post API completion
-- [ ] TESTS !!!
+## Other items
+- [ ] More Tests
 - [ ] Make simpler - maybe another branch to show simpler use of ``func (w http.ResponseWriter, r *http.Request) ``?
-- [ ] Better/simpler error / response handling - just ``w.WriteHeader`` on error
+- [x] Better/simpler error / response handling - just ``w.WriteHeader`` on error
 - [ ] alice/negroni chaining?
 - [ ] Optimise / Refactor / Data model Refining
 - [ ] Docker?
@@ -50,7 +50,7 @@ API route status
 
 # How it works
 
-> TODO
+See the [wiki](https://github.com/chilledoj/realworld-starter-kit/wiki) for more information.
 
 # Getting started
 

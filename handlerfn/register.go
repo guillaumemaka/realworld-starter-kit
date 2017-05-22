@@ -79,7 +79,6 @@ func register(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error 
 	if len(validationErrors.Errs) > 0 {
 		return validationErrors
 	}
-
 	// Persist
 	u, err := ae.DB.CreateUser(regUsr.User.Email, regUsr.User.Username, regUsr.User.Password)
 	if err != nil {
@@ -92,7 +91,6 @@ func register(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error 
 		return errors.Wrap(err, "register:: NewToken()")
 	}
 	u.Token = token
-
 	// Response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

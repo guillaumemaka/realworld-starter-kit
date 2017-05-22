@@ -52,8 +52,15 @@ func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
 	// Tags routes
 	api.Handle("/tags", hfn.GetTags(&env)).Methods("GET").Name("Get Tags")
 
+	// Router Handler Chaining (inner most first)
 	jwtRouter := hfn.Jwt2Ctx{Env: &env, Fn: r}
-	return handlers.RecoveryHandler()(handlers.CombinedLoggingHandler(os.Stdout, jwtRouter))
+	// CORS
+	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
+	originsOk := handlers.AllowedOrigins([]string{"https://conduit.productionready.io", "http://localhost:8000", "http://localhost:4100"})
+	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT"})
+	corsRouter := handlers.CORS(originsOk, headersOk, methodsOk)(jwtRouter)
+	logRouter := handlers.CombinedLoggingHandler(os.Stdout, corsRouter)
+	return handlers.RecoveryHandler()(logRouter)
 }
 
 /*

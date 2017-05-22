@@ -1,6 +1,7 @@
 package handlerfn
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/mail"
@@ -59,6 +60,9 @@ func login(ae *AppEnvironment, w http.ResponseWriter, r *http.Request) error {
 
 	// Check Credentials
 	u, err := ae.DB.UserByEmail(loginUsr.User.Email)
+	if err == sql.ErrNoRows {
+		return invalidLogin
+	}
 	if err != nil {
 		return errors.Wrap(err, "login:: DB.UserByEmail()")
 	}

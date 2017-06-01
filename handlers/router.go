@@ -22,14 +22,13 @@ type Router struct {
 	debug  bool
 }
 
-type contextKey string
-
-func (c contextKey) String() string {
-	return string(c)
-}
+const (
+	currentUserKey    = "current_user"
+	fetchedArticleKey = "article"
+	claimKey          = "claim"
+)
 
 func NewRouter(logger *log.Logger) *Router {
-	logger.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 	debug, err := strconv.ParseBool(os.Getenv("DEBUG"))
 	if err != nil {
 		debug = false
@@ -52,7 +51,7 @@ func NewRouter(logger *log.Logger) *Router {
 // To handle /blog/:id
 // r.AddRoute(`\/blog\/(?P<id>[0-9]+$`, h)
 // The id will be availabl in the http.Request Context passed to your handler
-func (r *Router) AddRoute(pattern string, method string, handler http.Handler) {
+func (r *Router) AddRoute(pattern string, method string, handler http.HandlerFunc) {
 	var found = false
 	for _, route := range r.routes {
 		if route.Pattern == pattern {
@@ -70,11 +69,6 @@ func (r *Router) AddRoute(pattern string, method string, handler http.Handler) {
 			},
 		})
 	}
-}
-
-// DebugMode enable debug, print some information about the handled request
-func (r *Router) DebugMode(enabled bool) {
-	r.debug = enabled
 }
 
 func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {

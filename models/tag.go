@@ -8,7 +8,7 @@ type TagStorer interface {
 
 type Tag struct {
 	ID            uint
-	Name          string `gorm:"unique"`
+	Name          string `gorm:"unique_index:index_tags_on_name"`
 	TaggingsCount uint
 	Articles      []Article `gorm:"many2many:taggings;"`
 }

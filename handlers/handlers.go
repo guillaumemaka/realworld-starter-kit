@@ -15,36 +15,24 @@ type Handler struct {
 	Logger *log.Logger
 }
 
+type errorJSON struct {
+	Errors models.ValidationErrors `json:"errors"`
+}
+
 func New(db *models.DB, jwt *auth.JWT, logger *log.Logger) *Handler {
 	return &Handler{db, jwt, logger}
 }
 
-func (h *Handler) UsersHandler(w http.ResponseWriter, r *http.Request) {
-	h.Logger.Println(r.Method, r.URL.Path)
-
-	switch r.Method {
-	case "POST":
-		h.RegisterUser(w, r)
-	case "GET":
-		// TODO:
-		// Check auth
-		// Get current users
-	case "PUT":
-		// TODO:
-		// Check auth
-		// Update user
-	default:
-		http.NotFound(w, r)
-	}
-}
-
-func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
-	h.Logger.Println(r.Method, r.URL.Path)
-
-	switch r.Method {
-	case "POST":
-		h.LoginUser(w, r)
-	default:
-		http.NotFound(w, r)
+func (h *Handler) authorize(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if claim := r.Context().Value(claimKey); claim != nil {
+			if currentUser := r.Context().Value(currentUserKey).(*models.User); (currentUser == &models.User{}) {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			} else {
+				next(w, r)
+			}
+		} else {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		}
 	}
 }

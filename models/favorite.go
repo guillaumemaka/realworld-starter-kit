@@ -5,9 +5,9 @@ import "github.com/jinzhu/gorm"
 type Favorite struct {
 	ID        int
 	User      User
-	UserID    int
+	UserID    int `gorm:"index:index_favorites_on_user_id"`
 	Article   Article
-	ArticleID int
+	ArticleID int `gorm:"index:index_favorites_on_article_id"`
 }
 
 func (f *Favorite) AfterCreate(db *gorm.DB) (err error) {

@@ -37,20 +37,19 @@ type ArticleStorer interface {
 // Article the article model
 type Article struct {
 	ID             int
-	Slug           string
+	Slug           string `gorm:"index:index_articles_on_slug"`
 	Title          string
 	Description    string
 	Body           string
 	User           User
-	UserID         int
+	UserID         int   `gorm:"index:index_articles_on_user_id"`
 	Tags           []Tag `gorm:"many2many:taggings;"`
 	Favorites      []Favorite
+	Comments       []Comment
 	FavoritesCount int
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
-
-type ValidationMessages map[string]interface{}
 
 var (
 	errorArticleAlreadyFavorited = errors.New("This article is already in your favorites !")
@@ -73,22 +72,22 @@ func NewArticle(title string, description string, body string, user *User) *Arti
 }
 
 // IsValid check if the article has a valid title, description and body
-func (a *Article) IsValid() (bool, map[string]interface{}) {
-	var errs = ValidationMessages{}
+func (a *Article) IsValid() (bool, ValidationErrors) {
+	var errs = ValidationErrors{}
 	var valid = true
 
 	if a.Title == "" {
-		errs["title"] = []string{"title field can't be blank"}
+		errs["title"] = []string{EMPTY_MSG}
 		valid = false
 	}
 
 	if a.Description == "" {
-		errs["description"] = []string{"description field can't be blank"}
+		errs["description"] = []string{EMPTY_MSG}
 		valid = false
 	}
 
 	if a.Body == "" {
-		errs["body"] = []string{"body field can't be blank"}
+		errs["body"] = []string{EMPTY_MSG}
 		valid = false
 	}
 
@@ -189,6 +188,7 @@ func (db *DB) FavoriteArticle(u *User, a *Article) error {
 
 	if !db.IsFavorited(u.ID, a.ID) {
 		err = db.Model(&a).Association("Favorites").Append(f).Error
+		err = db.First(&a).Error
 	} else {
 		err = errorArticleAlreadyFavorited
 	}
@@ -308,7 +308,7 @@ func (DB) FilterFavoritedBy(db *gorm.DB, value interface{}) *gorm.DB {
 
 // Offset set the wanted offset (defaulf: 0) to an existing *gorm.DB instance.
 func (DB) Offset(db *gorm.DB, offset interface{}) *gorm.DB {
-	var offsetValue = offset
+	var offsetValue interface{} = defaultOffset
 
 	switch offset.(type) {
 	case url.Values:
@@ -317,13 +317,13 @@ func (DB) Offset(db *gorm.DB, offset interface{}) *gorm.DB {
 
 		if v != "" {
 			intVal, err := strconv.Atoi(v)
-			if err != nil {
-				offsetValue = defaultOffset
-			} else {
+			if err == nil {
 				offsetValue = intVal
 			}
-		} else {
-			offsetValue = defaultOffset
+		}
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, sql.NullInt64:
+		if offset.(uint64) >= 0 {
+			offsetValue = offset
 		}
 	}
 
@@ -332,7 +332,7 @@ func (DB) Offset(db *gorm.DB, offset interface{}) *gorm.DB {
 
 // Limit set the number of max articles to fetch (defaulf: 20) to an existing *gorm.DB instance.
 func (DB) Limit(db *gorm.DB, limit interface{}) *gorm.DB {
-	var limitValue = limit
+	var limitValue interface{} = defaultLimit
 
 	switch limit.(type) {
 	case url.Values:
@@ -341,13 +341,15 @@ func (DB) Limit(db *gorm.DB, limit interface{}) *gorm.DB {
 
 		if v != "" {
 			intVal, err := strconv.Atoi(v)
-			if err != nil {
-				limitValue = defaultLimit
-			} else {
-				limitValue = intVal
+			if err == nil {
+				if intVal == 0 {
+					limitValue = intVal
+				}
 			}
-		} else {
-			limitValue = defaultLimit
+		}
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, sql.NullInt64:
+		if limit.(uint64) == 0 {
+			limitValue = limit
 		}
 	}
 

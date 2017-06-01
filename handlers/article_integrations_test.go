@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/JackyChiu/realworld-starter-kit/models"
 	"github.com/Machiel/slugify"
 	"github.com/jinzhu/gorm"
+	"gopkg.in/testfixtures.v2"
 )
 
 type articleEntity struct {
@@ -26,13 +26,14 @@ type article struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Body        string   `json:"body"`
-	TagsList    []string `json:"tagsList"`
+	TagList     []string `json:"tagList"`
 }
 
 var (
 	h        *Handler
 	DB       *gorm.DB
 	articles []*models.Article
+	fixtures *testfixtures.Context
 )
 
 func TestMain(m *testing.M) {
@@ -50,15 +51,31 @@ func TestMain(m *testing.M) {
 	j := auth.NewJWT()
 	h = New(db, j, logger)
 
-	seed()
+	fixtures, err := testfixtures.NewFolder(DB.DB(), &testfixtures.SQLite{}, "../fixtures")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := fixtures.Load(); err != nil {
+		log.Fatal(err)
+	}
+
+	DB.Model(models.Article{}).
+		Preload("User").
+		Preload("Tags").
+		Preload("Comments").
+		Preload("Comments.User").
+		Preload("Favorites").
+		Preload("Favorites.User").
+		Find(&articles)
+
 	exit := m.Run()
-	cleanDatabase()
 
 	os.Exit(exit)
 }
 
 func TestArticlesHandler_Index(t *testing.T) {
-	recorder := makeRequest(t, "GET", "/api/articles", nil, nil)
+	recorder := makeRequest(t, http.MethodGet, "/api/articles", nil, nil)
 
 	if status := recorder.Code; status != http.StatusOK {
 		t.Errorf("should return a 200 status code: got %v want %v",
@@ -86,7 +103,7 @@ func TestArticlesHandler_Index(t *testing.T) {
 
 func TestArticlesHandler_Read(t *testing.T) {
 	a := articles[0]
-	recorder := makeRequest(t, "GET", "/api/articles/"+a.Slug, nil, nil)
+	recorder := makeRequest(t, http.MethodGet, "/api/articles/"+a.Slug, nil, nil)
 
 	var article ArticleJSON
 	json.NewDecoder(recorder.Body).Decode(&article)
@@ -110,7 +127,7 @@ func TestArticlesHandler_Read(t *testing.T) {
 
 func TestArticlesHandler_FilterByTag(t *testing.T) {
 	a := articles[0]
-	recorder := makeRequest(t, "GET", "/api/articles?tag="+a.Tags[0].Name, nil, nil)
+	recorder := makeRequest(t, http.MethodGet, "/api/articles?tag="+a.Tags[0].Name, nil, nil)
 
 	var articlesResponse ArticlesJSON
 	json.NewDecoder(recorder.Body).Decode(&articlesResponse)
@@ -131,7 +148,7 @@ func TestArticlesHandler_FilterByTag(t *testing.T) {
 
 func TestArticlesHandler_FilterByAuthor(t *testing.T) {
 	a := articles[0]
-	recorder := makeRequest(t, "GET", "/api/articles?author="+a.User.Username, nil, nil)
+	recorder := makeRequest(t, http.MethodGet, "/api/articles?author="+a.User.Username, nil, nil)
 
 	var articles ArticlesJSON
 	json.NewDecoder(recorder.Body).Decode(&articles)
@@ -151,7 +168,7 @@ func TestArticlesHandler_FilterByAuthor(t *testing.T) {
 
 func TestArticlesHandler_FilterByFavorited(t *testing.T) {
 	a := articles[0]
-	recorder := makeRequest(t, "GET", "/api/articles?favorited="+a.Favorites[0].User.Username, nil, nil)
+	recorder := makeRequest(t, http.MethodGet, "/api/articles?favorited="+a.Favorites[0].User.Username, nil, nil)
 
 	var articles ArticlesJSON
 	json.NewDecoder(recorder.Body).Decode(&articles)
@@ -170,11 +187,11 @@ func TestArticlesHandler_CreateUnauthorized(t *testing.T) {
 		Title:       "GoLang Web Services",
 		Description: "GoLang Web Services description",
 		Body:        "GoLang Web Services",
-		TagsList:    []string{"Go"},
+		TagList:     []string{"Go"},
 	}
 
 	json, _ := json.Marshal(a)
-	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(json), nil)
+	recorder := makeRequest(t, http.MethodPost, "/api/articles", bytes.NewBuffer(json), nil)
 
 	if Code := recorder.Code; Code != http.StatusUnauthorized {
 		t.Errorf("should return a 401 status code: got %v want %v", Code, http.StatusUnauthorized)
@@ -187,7 +204,7 @@ func TestArticlesHandler_Create(t *testing.T) {
 			Title:       "GoLang Web Services",
 			Description: "GoLang Web Services description",
 			Body:        "GoLang Web Services",
-			TagsList:    []string{"Go", "Web Services"},
+			TagList:     []string{"Go", "Web Services"},
 		},
 	}
 
@@ -196,7 +213,7 @@ func TestArticlesHandler_Create(t *testing.T) {
 	jwt := auth.NewJWT().NewToken(u.Username)
 
 	jsonBody, _ := json.Marshal(a)
-	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
+	recorder := makeRequest(t, http.MethodPost, "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
@@ -222,12 +239,12 @@ func TestArticlesHandler_Create(t *testing.T) {
 		t.Errorf("should return the correct article body: got %v want %v", article.Body, lastArticle.Body)
 	}
 
-	if article := articleResponse.Article; article.TagsList[0] != lastArticle.Tags[0].Name {
-		t.Errorf("should return the correct article tags: got %v want %v", article.TagsList[0], lastArticle.Tags[0].Name)
+	if article := articleResponse.Article; article.TagList[0] != lastArticle.Tags[0].Name {
+		t.Errorf("should return the correct article tags: got %v want %v", article.TagList[0], lastArticle.Tags[0].Name)
 	}
 
-	if article := articleResponse.Article; article.TagsList[1] != lastArticle.Tags[1].Name {
-		t.Errorf("should return the correct article tags: got %v want %v", article.TagsList[1], lastArticle.Tags[1].Name)
+	if article := articleResponse.Article; article.TagList[1] != lastArticle.Tags[1].Name {
+		t.Errorf("should return the correct article tags: got %v want %v", article.TagList[1], lastArticle.Tags[1].Name)
 	}
 }
 
@@ -237,7 +254,7 @@ func TestArticlesHandler_CreateWithEmptyTitle(t *testing.T) {
 			Title:       "",
 			Description: "GoLang Web Services description",
 			Body:        "GoLang Web Services",
-			TagsList:    []string{"Go", "Web Services"},
+			TagList:     []string{"Go", "Web Services"},
 		},
 	}
 
@@ -248,7 +265,7 @@ func TestArticlesHandler_CreateWithEmptyTitle(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
+	recorder := makeRequest(t, http.MethodPost, "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
@@ -256,7 +273,7 @@ func TestArticlesHandler_CreateWithEmptyTitle(t *testing.T) {
 		t.Errorf("should return a 422 status code: got %v want %v", Code, http.StatusUnprocessableEntity)
 	}
 
-	var errorResponse errorResponse
+	var errorResponse errorJSON
 	json.NewDecoder(recorder.Body).Decode(&errorResponse)
 
 	if _, present := errorResponse.Errors["title"]; !present {
@@ -270,7 +287,7 @@ func TestArticlesHandler_CreateWithEmptyDescription(t *testing.T) {
 			Title:       "GoLang Web Services",
 			Description: "",
 			Body:        "GoLang Web Services",
-			TagsList:    []string{"Go", "Web Services"},
+			TagList:     []string{"Go", "Web Services"},
 		},
 	}
 
@@ -280,7 +297,7 @@ func TestArticlesHandler_CreateWithEmptyDescription(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
+	recorder := makeRequest(t, http.MethodPost, "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
@@ -288,7 +305,7 @@ func TestArticlesHandler_CreateWithEmptyDescription(t *testing.T) {
 		t.Errorf("should return a 422 status code: got %v want %v", Code, http.StatusUnprocessableEntity)
 	}
 
-	var errorResponse errorResponse
+	var errorResponse errorJSON
 	json.NewDecoder(recorder.Body).Decode(&errorResponse)
 
 	if _, present := errorResponse.Errors["description"]; !present {
@@ -302,7 +319,7 @@ func TestArticlesHandler_CreateWithEmptyBody(t *testing.T) {
 			Title:       "GoLang Web Services",
 			Description: "GoLang Web Services",
 			Body:        "",
-			TagsList:    []string{"Go", "Web Services"},
+			TagList:     []string{"Go", "Web Services"},
 		},
 	}
 
@@ -312,7 +329,7 @@ func TestArticlesHandler_CreateWithEmptyBody(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	recorder := makeRequest(t, "POST", "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
+	recorder := makeRequest(t, http.MethodPost, "/api/articles", bytes.NewBuffer(jsonBody), http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
@@ -320,7 +337,7 @@ func TestArticlesHandler_CreateWithEmptyBody(t *testing.T) {
 		t.Errorf("should return a 422 status code: got %v want %v", Code, http.StatusUnprocessableEntity)
 	}
 
-	var errorResponse errorResponse
+	var errorResponse errorJSON
 	json.NewDecoder(recorder.Body).Decode(&errorResponse)
 
 	if _, present := errorResponse.Errors["body"]; !present {
@@ -341,7 +358,7 @@ func TestArticlesHandler_UpdateForbidden(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	recorder := makeRequest(t, "PUT", "/api/articles/"+a.Slug, bytes.NewBuffer(jsonBody), http.Header{
+	recorder := makeRequest(t, http.MethodPut, "/api/articles/"+a.Slug, bytes.NewBuffer(jsonBody), http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
@@ -359,7 +376,7 @@ func TestArticlesHandler_UpdateNotAuthorized(t *testing.T) {
 		},
 	})
 
-	recorder := makeRequest(t, "PUT", "/api/articles/"+a.Slug, bytes.NewBuffer(jsonBody), nil)
+	recorder := makeRequest(t, http.MethodPut, "/api/articles/"+a.Slug, bytes.NewBuffer(jsonBody), nil)
 
 	if Code := recorder.Code; Code != http.StatusUnauthorized {
 		t.Errorf("should return a 401 status code: got %v want %v", Code, http.StatusUnauthorized)
@@ -378,7 +395,7 @@ func TestArticlesHandler_UpdateOK(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(a.User.Username)
 
-	recorder := makeRequest(t, "PUT", "/api/articles/"+a.Slug, bytes.NewBuffer(jsonBody), http.Header{
+	recorder := makeRequest(t, http.MethodPut, "/api/articles/"+a.Slug, bytes.NewBuffer(jsonBody), http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %s", jwt)},
 	})
 
@@ -408,7 +425,7 @@ func TestArticlesHandler_Favorite(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	var recorder = makeRequest(t, "POST", "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
+	var recorder = makeRequest(t, http.MethodPost, "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
@@ -437,7 +454,7 @@ func TestArticlesHandler_FavoriteAlreadyFavoritedArticle(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	var recorder = makeRequest(t, "POST", "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
+	var recorder = makeRequest(t, http.MethodPost, "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
@@ -459,7 +476,7 @@ func TestArticlesHandler_Unfavorite(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	var recorder = makeRequest(t, "DELETE", "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
+	var recorder = makeRequest(t, http.MethodDelete, "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
@@ -486,7 +503,7 @@ func TestArticlesHandler_UnfavoriteNotYetFavoritedArticle(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	var recorder = makeRequest(t, "DELETE", "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
+	var recorder = makeRequest(t, http.MethodDelete, "/api/articles/"+a.Slug+"/favorite", nil, http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
@@ -520,7 +537,7 @@ func TestArticlesHandler_DeleteOk(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(u.Username)
 
-	recorder := makeRequest(t, "DELETE", "/api/articles/"+a.Slug, nil, http.Header{
+	recorder := makeRequest(t, http.MethodDelete, "/api/articles/"+a.Slug, nil, http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
@@ -544,7 +561,7 @@ func TestArticlesHandler_DeleteForbidden(t *testing.T) {
 
 	jwt := auth.NewJWT().NewToken(unauthorizedUser.Username)
 
-	recorder := makeRequest(t, "DELETE", "/api/articles/"+a.Slug, nil, http.Header{
+	recorder := makeRequest(t, http.MethodDelete, "/api/articles/"+a.Slug, nil, http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
@@ -556,7 +573,7 @@ func TestArticlesHandler_DeleteForbidden(t *testing.T) {
 func TestArticlesHandler_DeleteUnauthorized(t *testing.T) {
 	slug := articles[0].Slug
 
-	var recorder = makeRequest(t, "DELETE", "/api/articles/"+slug, nil, nil)
+	var recorder = makeRequest(t, http.MethodDelete, "/api/articles/"+slug, nil, nil)
 
 	if Code := recorder.Code; Code != http.StatusUnauthorized {
 		t.Errorf("should get a 401 status code: got %v want %v", Code, http.StatusUnauthorized)
@@ -566,7 +583,7 @@ func TestArticlesHandler_DeleteUnauthorized(t *testing.T) {
 func TestArticlesHandler_ValidTokenButUserNotExist(t *testing.T) {
 	jwt := auth.NewJWT().NewToken("non-existing-username")
 
-	recorder := makeRequest(t, "GET", "/api/articles", nil, http.Header{
+	recorder := makeRequest(t, http.MethodGet, "/api/articles", nil, http.Header{
 		"Authorization": []string{fmt.Sprintf("Token %v", jwt)},
 	})
 
@@ -594,107 +611,4 @@ func makeRequest(t *testing.T, method string, url string, body io.Reader, header
 	h.ArticlesHandler(recorder, req)
 
 	return recorder
-}
-
-func createDummyTags(tagsName ...string) []models.Tag {
-	var tags []models.Tag
-
-	for _, tag := range tagsName {
-		t := models.Tag{Name: tag}
-
-		if DB.First(&t, t).RecordNotFound() {
-			DB.Create(&t)
-		}
-
-		tags = append(tags, t)
-	}
-
-	return tags
-}
-
-func createDummyArticle(tagsName ...string) *models.Article {
-	title := generateString("Dummy Article Title")
-	description := generateString("Description Article Title")
-	body := generateString("Body Article Title")
-	article := models.NewArticle(title, description, body, createDummyUser())
-
-	h.DB.CreateArticle(article)
-
-	if len(tagsName) > 0 {
-		article.Tags = createDummyTags(tagsName...)
-	}
-
-	DB.Save(&article)
-
-	return article
-}
-
-// Create a list of <count> articles with tagsName...
-// Each articles will be favorited by 3 users
-func createDummyArticles(count int, tagsName ...string) []*models.Article {
-	if count <= 0 {
-		return []*models.Article{}
-	}
-
-	userFav1 := *createDummyUser()
-	userFav2 := *createDummyUser()
-	userFav3 := *createDummyUser()
-
-	var articles []*models.Article
-	for i := 0; i < count; i++ {
-		title := generateString("Dummy Article Title")
-		description := generateString("Description Article Title")
-		body := generateString("Body Article Title")
-		article := models.NewArticle(title, description, body, createDummyUser())
-
-		h.DB.CreateArticle(article)
-
-		if len(tagsName) > 0 {
-			DB.Model(&article).Association("Tags").Append(createDummyTags(tagsName...))
-		}
-
-		favorites := []models.Favorite{
-			models.Favorite{User: userFav1},
-			models.Favorite{User: userFav2},
-			models.Favorite{User: userFav3},
-		}
-
-		DB.Model(&article).Association("Favorites").Append(favorites)
-
-		articles = append(articles, article)
-	}
-
-	return articles
-}
-
-func createDummyUser() *models.User {
-	user, _ := models.NewUser(
-		generateEmail(),
-		generateString("user"),
-		"password")
-
-	DB.Create(&user)
-
-	return user
-}
-
-func generateString(from string) string {
-	return fmt.Sprintf("%s %d", from, rand.Int())
-}
-
-func generateEmail() string {
-	slug := slugify.Slugify(generateString("email"))
-	return fmt.Sprintf("%s@example.com", slug)
-}
-
-func seed() {
-	articles = createDummyArticles(5, "tag1")
-}
-
-func cleanDatabase() {
-	DB.DropTable("users")
-	DB.DropTable("articles")
-	DB.DropTable("tags")
-	DB.DropTable("taggings")
-	DB.DropTable("favorites")
 }

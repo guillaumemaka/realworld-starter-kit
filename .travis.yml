@@ -1,0 +1,12 @@
+language: go
+go:
+  - 1.7
+  - 1.8
+  - master
+
+install:
+  - go get -v github.com/Machiel/slugify
+  - go get -v github.com/jinzhu/gorm
+  - go get -v gopkg.in/testfixtures.v2
+
+script: go test -v ./...

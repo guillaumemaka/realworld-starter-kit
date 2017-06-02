@@ -165,6 +165,9 @@ func (adb *AppDB) GetArticle(slug string, whosasking uint) (*Article, error) {
 
 func splitTagString(tags string) (tagList []Tag) {
 	tagList = make([]Tag, 0)
+	if len(tags) < 1 {
+		return
+	}
 	for _, v := range strings.Split(tags, "||") {
 		tagList = append(tagList, Tag(v))
 	}
@@ -235,9 +238,8 @@ func (adb *AppDB) ListArticles(opt ListArticleOptions, whosasking uint, feed boo
 			return nil, err
 		}
 		a.Author = &p
-		if len(tags) > 0 {
-			a.TagList = splitTagString(tags)
-		}
+		a.TagList = splitTagString(tags)
+
 		articles = append(articles, a)
 	}
 	return articles, nil

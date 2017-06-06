@@ -82,14 +82,18 @@ A run command is provided in the ``makefile`` which will first run the build ste
 ```
 make run
 ```
-**N.B.** The database URL (containing user+pass+host+port) can be set as an environment variable, or passed as a flag to the executable
+**N.B.** The database URL (containing user+pass+host+port) can be set as an environment variable, passed as a flag to the executable or set in the ``config.ini`` file.
 ```
 ./bin/backend -dburl "root:password@/conduit?parseTime=true"
 // or
 DBURL=root:password@/conduit?parseTime=true ./bin/backend
+// or -config config.ini
+dburl=root:password@/conduit?parseTime=true
 ```
 
-Additionally the IP host and ports are currently defaulted to run on ":8080", but can be passed in as ENV variables or command line flags ``HOST or -host`` and ``PORT or -port``.
+Additionally the IP host and ports are currently defaulted to run on ":8080", but can be passed in as ENV variables, command line flags or in the config.ini file: ``HOST or -host or host=`` and ``PORT or -port or port=``.
+
+N.B. See the [flags package](https://github.com/namsral/flag) for more details on these are handled. 
 
 # Contributing
 Raise an issue and/or Pull Request. Alternatively create your own better fork.

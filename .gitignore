@@ -11,12 +11,18 @@
 *.launch
 .settings/
 
-
 #System Files
 .DS_Store
 Thumbs.db
 
 # Builds
-/bin
-/build
-/dist
+bin
+build
+dist
+public/*
+!public/.gitkeep
+!public/static
+
+# SSL
+*.pem
+*.key

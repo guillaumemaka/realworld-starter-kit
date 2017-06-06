@@ -14,14 +14,20 @@ import (
 )
 
 var (
-	host  string
-	port  int
-	dbURL string
+	https                    bool
+	origins, host, cert, key string
+	port                     int
+	dbURL                    string
 )
 
 func init() {
+	flag.String(flag.DefaultConfigFlagname, "./config.ini", "path to config file")
+	flag.BoolVar(&https, "https", false, "If https is provided -cert and -key must be defined")
+	flag.StringVar(&cert, "cert", "./cert.pem", "HTTPS certificate filepath")
+	flag.StringVar(&key, "key", "./key.pem", "HTTPS key filepath")
 	flag.StringVar(&host, "host", "", "WWW Host ip address for http connections")
 	flag.IntVar(&port, "port", 8080, "WWW Port to listen for http connections")
+	flag.StringVar(&origins, "origins", "", "list of allowed origins for CORS")
 	flag.StringVar(&dbURL, "dburl", "", "DB Connection URL")
 	flag.Parse()
 }
@@ -41,9 +47,25 @@ func main() {
 	}
 
 	appdb := &models.AppDB{DB: db}
-	r := buildRouter(appdb, logger)
+	var protocol string
+	if https {
+		protocol = "https"
+	} else {
+		protocol = "http"
+	}
 
 	addr := fmt.Sprintf("%s:%d", host, port)
+	fulladdr := fmt.Sprintf("%s://%s", protocol, addr)
 
-	log.Fatal(http.ListenAndServe(addr, r))
+	r := buildRouter(appdb, logger, fulladdr)
+
+	logger.Printf("Starting %s listener on %s", protocol, addr)
+	logger.Printf("Navigate to %s", fulladdr)
+	if https {
+		err = http.ListenAndServeTLS(addr, cert, key, r)
+	} else {
+		err = http.ListenAndServe(addr, r)
+	}
+	log.Fatal(err)
+
 }

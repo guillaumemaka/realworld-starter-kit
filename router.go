@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	hfn "github.com/chilledoj/realworld-starter-kit/handlerfn"
 	"github.com/chilledoj/realworld-starter-kit/models"
@@ -12,12 +13,20 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
+func buildRouter(db *models.AppDB, logger *log.Logger, fullyqualifiedlisteningaddress string) http.Handler {
 
 	env := hfn.AppEnvironment{DB: db, Logger: logger}
 
 	//na := notImplemented{}
 	r := mux.NewRouter()
+
+	/*
+	 Public files handler for front end files, if required
+	 Copy the compiled front end index.html into the public folder and the
+	 compiled js assets into the public/static folder
+	*/
+	r.Handle("/", http.FileServer(http.Dir("./public")))
+	r.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("./public/static"))))
 
 	r.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -56,8 +65,11 @@ func buildRouter(db *models.AppDB, logger *log.Logger) http.Handler {
 	jwtRouter := hfn.Jwt2Ctx{Env: &env, Fn: r}
 	// CORS
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"})
-	originsOk := handlers.AllowedOrigins([]string{"https://conduit.productionready.io", "http://localhost:8000", "http://localhost:4100"})
-	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT"})
+	methodsOk := handlers.AllowedMethods([]string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete})
+
+	cfgOrigins := strings.Split(origins, ",")
+	originsOk := handlers.AllowedOrigins(append([]string{fullyqualifiedlisteningaddress}, cfgOrigins...))
+
 	corsRouter := handlers.CORS(originsOk, headersOk, methodsOk)(jwtRouter)
 	logRouter := handlers.CombinedLoggingHandler(os.Stdout, corsRouter)
 	return handlers.RecoveryHandler()(logRouter)

@@ -1,0 +1,25 @@
+version: '3'
+services:
+    app:
+        image: conduit_go_app
+        build: .
+        ports:
+            - 8080:8080
+            - 8081:8081
+        environment:
+            - DBURL=root:password@tcp(mysql:3306)/conduit?parseTime=true
+            - HTTPS=1
+            - CERT=server.crt
+            - KEY=server.key
+        command: ./wait-for-it.sh -h mysql -p 3306 -- ./bin/backend
+        depends_on:
+            - mysql
+    mysql:
+        image: mysql
+        ports:
+            - 3306:3306
+        volumes:
+            - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+        environment: 
+            - MYSQL_ROOT_PASSWORD=password
+            - MYSQL_DATABASE=conduit

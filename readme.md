@@ -95,5 +95,26 @@ Additionally the IP host and ports are currently defaulted to run on ":8080", bu
 
 N.B. See the [flags package](https://github.com/namsral/flag) for more details on these are handled. 
 
+### With Docker
+
+#### Generate SSL self-signed certificate
+
+```console
+openssl genrsa -out server.key 2048
+```
+
+
+```console
+openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650
+```
+
+#### Build & Run
+
+```console
+docker-compose up --build
+```
+
+The api will be available at https://localhost:8080
+
 # Contributing
 Raise an issue and/or Pull Request. Alternatively create your own better fork.

@@ -153,16 +153,20 @@ func (h *Handler) getArticle(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getArticles(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var articles = []models.Article{}
+	var articlesJSON ArticlesJSON
 
 	query := h.DB.GetAllArticles()
 
 	r.ParseForm()
 
-	query = h.DB.Limit(query, r.Form)
-	query = h.DB.Offset(query, r.Form)
 	query = h.DB.FilterByTag(query, r.Form)
 	query = h.DB.FilterAuthoredBy(query, r.Form)
 	query = h.DB.FilterFavoritedBy(query, r.Form)
+
+	query.Count(&articlesJSON.ArticlesCount)
+
+	query = h.DB.Limit(query, r.Form)
+	query = h.DB.Offset(query, r.Form)
 
 	err = query.Find(&articles).Error
 
@@ -180,13 +184,10 @@ func (h *Handler) getArticles(w http.ResponseWriter, r *http.Request) {
 
 	var u = r.Context().Value(currentUserKey).(*models.User)
 
-	var articlesJSON ArticlesJSON
 	for i := range articles {
 		a := &articles[i]
 		articlesJSON.Articles = append(articlesJSON.Articles, h.buildArticleJSON(a, u))
 	}
-
-	articlesJSON.ArticlesCount = len(articles)
 
 	json.NewEncoder(w).Encode(articlesJSON)
 }
